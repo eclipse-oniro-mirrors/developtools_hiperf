@@ -611,30 +611,32 @@ void PerfRecordSample::ParseSampleReadData(uint8_t *&p, u64 &dataSize)
     if ((sampleType_ & PERF_SAMPLE_READ) == 0) {
         return;
     }
-    if (!(readFormat_ & PERF_FORMAT_GROUP)) {
-        PopFromBinary(true, p, data_.v.value, dataSize);
-        PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.v.timeEnabled, dataSize);
-        PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.v.timeRunning, dataSize);
-        PopFromBinary(readFormat_ & PERF_FORMAT_ID, p, data_.v.id, dataSize);
-        data_.read_nr = 1;
-        data_.read_time_enabled = data_.v.timeEnabled;
-        data_.read_time_running = data_.v.timeRunning;
-        data_.read_values = &(data_.v.value);
-        data_.read_ids = (readFormat_ & PERF_FORMAT_ID) ? &(data_.v.id) : nullptr;
+    if (readFormat_ & PERF_FORMAT_GROUP) {
+        PopFromBinary(true, p, data_.read_nr, dataSize);
+        PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.read_time_enabled, dataSize);
+        PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.read_time_running, dataSize);
+        if (data_.read_nr > 0) {
+            data_.read_values = reinterpret_cast<u64 *>(p);
+            if (readFormat_ & PERF_FORMAT_ID) {
+                // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
+                data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
+                if (!SafeSetPointerOffset(p, data_.read_nr,
+                    sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize)) return;
+            } else {
+                if (!SafeSetPointerOffset(p, data_.read_nr, sizeof(u64), dataSize)) return;
+            }
+        }
         return;
     }
-    PopFromBinary(true, p, data_.read_nr, dataSize);
-    PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.read_time_enabled, dataSize);
-    PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.read_time_running, dataSize);
-    if (data_.read_nr == 0) return;
-    data_.read_values = reinterpret_cast<u64 *>(p);
-    if (readFormat_ & PERF_FORMAT_ID) {
-        data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
-        if (!SafeSetPointerOffset(p, data_.read_nr,
-            sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize)) return;
-    } else {
-        if (!SafeSetPointerOffset(p, data_.read_nr, sizeof(u64), dataSize)) return;
-    }
+    PopFromBinary(true, p, data_.v.value, dataSize);
+    PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.v.timeEnabled, dataSize);
+    PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.v.timeRunning, dataSize);
+    PopFromBinary(readFormat_ & PERF_FORMAT_ID, p, data_.v.id, dataSize);
+    data_.read_nr = 1;
+    data_.read_time_enabled = data_.v.timeEnabled;
+    data_.read_time_running = data_.v.timeRunning;
+    data_.read_values = &(data_.v.value);
+    data_.read_ids = (readFormat_ & PERF_FORMAT_ID) ? &(data_.v.id) : nullptr;
 }
 
 void PerfRecordSample::ParseSampleTailData(uint8_t *&p, const perf_event_attr &attr,
@@ -869,12 +871,7 @@ void PerfRecordSample::DumpRaw(const int indent) const
     if (sampleType_ & PERF_SAMPLE_RAW) {
         PRINT_INDENT(indent, "raw size=%u\n", data_.raw_size);
         const uint32_t *data = reinterpret_cast<const uint32_t *>(data_.raw_data);
-        size_t maxSize = RECORD_SIZE_LIMIT_SPE / sizeof(uint32_t);
         size_t size = data_.raw_size / sizeof(uint32_t);
-        if (size > maxSize) {
-            HLOGE("raw_size %u too large, clamped", data_.raw_size);
-            size = maxSize;
-        }
         for (size_t i = 0; i < size; ++i) {
             PRINT_INDENT(indent + 1, "0x%08x (%x)\n", data[i], data[i]);
         }

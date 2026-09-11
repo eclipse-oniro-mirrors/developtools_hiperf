@@ -191,7 +191,7 @@ void RecordProcessor::UpdateSymbols(const std::shared_ptr<DfxMap>& map, const pi
 void RecordProcessor::UpdateFromRecord(PerfRecordSample& recordSample)
 {
     threadManager_.UpdateThread(recordSample.data_.pid, recordSample.data_.tid);
-    if (recordSample.data_.server_nr && recordSample.data_.server_nr <= RECORD_SIZE_LIMIT / sizeof(u64)) {
+    if (recordSample.data_.server_nr) {
         // update all server threads
         for (size_t i = 0; i < recordSample.data_.server_nr; i++) {
             pid_t pid = static_cast<pid_t>(recordSample.data_.server_pids[i]);
@@ -378,9 +378,7 @@ void RecordProcessor::FixHMBundleMmap(char* filename, const int pid, u16& header
         if (strncpy_s(filename, KILO, newFilename.c_str(), newFilename.size()) != 0) {
             HLOGD("strncpy_s recordMmap2 failed!");
         }
-        if (newFilename.size() >= oldSize) {
-            headerSize += newFilename.size() - oldSize;
-        }
+        headerSize += newFilename.size() - oldSize;
     }
 }
 

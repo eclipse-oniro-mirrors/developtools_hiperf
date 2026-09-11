@@ -264,10 +264,7 @@ int ReportProtobufFileReader::Dump(uint32_t &recordLength, ProtobufReadBack read
     }
     if (recordLength != 0) {
         constexpr uint32_t MAX_RECORD_LENGTH = 100U * 1024U * 1024U;
-        if (recordLength > MAX_RECORD_LENGTH) {
-            printf("recordLength %u too large\n", recordLength);
-            return -1;
-        }
+        CHECK_TRUE(recordLength <= MAX_RECORD_LENGTH, -1, 0, "recordLength %u too large\n", recordLength);
         PRINT_INDENT(defaultIndent, "record length:%u (%x)\n", recordLength, recordLength);
         HiperfRecord record;
         std::string recordBuf;

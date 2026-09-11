@@ -91,7 +91,9 @@ void VirtualThreadTest::MakeMapsFromDlpi(const std::string &dlpiName,
 
         DfxMap &item = phdrMaps.emplace_back();
         item.begin = (info->dlpi_addr + info->dlpi_phdr[i].p_vaddr);
-        item.end = RoundUp(item.begin + info->dlpi_phdr[i].p_memsz, info->dlpi_phdr[i].p_align);
+        auto memEnd = item.begin + info->dlpi_phdr[i].p_memsz;
+        auto align = info->dlpi_phdr[i].p_align;
+        item.end = (align > 1) ? ((memEnd + align - 1) / align) * align : memEnd;
         item.offset = info->dlpi_phdr[i].p_offset;
         item.name = dlpiName;
     }

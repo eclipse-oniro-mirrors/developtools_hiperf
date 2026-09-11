@@ -1435,47 +1435,6 @@ HWTEST_F(UtilitiesTest, IsContainerProcess_CurrentProcess, TestSize.Level2)
 }
 
 /**
- * @tc.name: TestRoundUpBasic
- * @tc.desc: Test RoundUp function with basic alignment values
- * @tc.type: FUNC
- */
-HWTEST_F(UtilitiesTest, TestRoundUpBasic, TestSize.Level2)
-{
-    // Test alignment with 4
-    EXPECT_EQ(RoundUp(0, 4), 0u);
-    EXPECT_EQ(RoundUp(1, 4), 4u);
-    EXPECT_EQ(RoundUp(2, 4), 4u);
-    EXPECT_EQ(RoundUp(3, 4), 4u);
-    EXPECT_EQ(RoundUp(4, 4), 4u);
-    EXPECT_EQ(RoundUp(5, 4), 8u);
-    
-    // Test alignment with 8
-    EXPECT_EQ(RoundUp(0, 8), 0u);
-    EXPECT_EQ(RoundUp(7, 8), 8u);
-    EXPECT_EQ(RoundUp(8, 8), 8u);
-    EXPECT_EQ(RoundUp(9, 8), 16u);
-    
-    // Test alignment with 16
-    EXPECT_EQ(RoundUp(15, 16), 16u);
-    EXPECT_EQ(RoundUp(16, 16), 16u);
-    EXPECT_EQ(RoundUp(17, 16), 32u);
-}
-
-/**
- * @tc.name: TestRoundUpLargeValues
- * @tc.desc: Test RoundUp function with large values
- * @tc.type: FUNC
- */
-HWTEST_F(UtilitiesTest, TestRoundUpLargeValues, TestSize.Level2)
-{
-    // Test large values
-    EXPECT_EQ(RoundUp(1000, 4), 1000u);
-    EXPECT_EQ(RoundUp(1001, 4), 1004u);
-    EXPECT_EQ(RoundUp(1000000, 8), 1000000u);
-    EXPECT_EQ(RoundUp(1000001, 8), 1000008u);
-}
-
-/**
  * @tc.name: TestIsStringToIntSuccessValid
  * @tc.desc: Test IsStringToIntSuccess with valid integer strings
  * @tc.type: FUNC

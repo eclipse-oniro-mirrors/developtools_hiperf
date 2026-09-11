@@ -37,8 +37,11 @@ static const std::vector<std::string> FEATURE_NAMES = {
     "cache",           "sample_time",  "mem_topology", "last_feature",
 };
 static constexpr size_t MAX_VECTOR_RESIZE_COUNT = 100000;
+#ifdef FUZZER_TEST
+    // issue from fuzz test and also will lead to PerfFileSectionSymbolsFiles uncompletely construct
 static constexpr size_t MAX_SYMBOLS_FILE_NUMBER = 300;
 static constexpr size_t MAX_SYMBOLS_NUMBER = 10000;
+#endif
 std::string PerfFileSection::GetFeatureName(FEATURE featureId)
 {
     unsigned int index = static_cast<unsigned int>(featureId);
@@ -156,9 +159,6 @@ bool PerfFileSection::Read(std::string &value)
 }
 void PerfFileSection::Skip(const size_t size)
 {
-    if (offset_ + size > maxSize_) {
-        return;
-    }
     offset_ += size;
 }
 
@@ -248,9 +248,11 @@ void PerfFileSectionSymbolsFiles::ReadSymbolFileStructs()
     if (!Read(symbolFileNumber)) {
         HLOGE(" symbolFileNumber read failed");
         return;
+#ifdef FUZZER_TEST
     } else if (symbolFileNumber > MAX_SYMBOLS_FILE_NUMBER) {
-        HLOGE("symbolFileNumber %u exceeds limit %zu", symbolFileNumber, MAX_SYMBOLS_FILE_NUMBER);
+        HLOGE(" symbolFileNumber %u too large", symbolFileNumber);
         return;
+#endif
     } else {
         HLOGV(" symbolFileNumber %u", symbolFileNumber);
     }
@@ -270,9 +272,11 @@ void PerfFileSectionSymbolsFiles::ReadSymbolFileStructs()
         if (!Read(symbolsNumber)) {
             HLOGE(" symbols read failed");
             return;
+#ifdef FUZZER_TEST
         } else if (symbolsNumber > MAX_SYMBOLS_NUMBER) {
-            HLOGE("symbolsNumber %u exceeds limit %zu", symbolsNumber, MAX_SYMBOLS_NUMBER);
+            HLOGE(" symbols %u too large", symbolsNumber);
             return;
+#endif
         } else {
             HLOGV(" symbols %u", symbolsNumber);
         }
@@ -335,10 +339,6 @@ PerfFileSectionUniStackTable::PerfFileSectionUniStackTable(const FEATURE id, con
         return;
     }
     HLOGV("processTableCount %" PRIu32 "\n", processTableCount);
-    if (processTableCount > MAX_VECTOR_RESIZE_COUNT) {
-        HLOGE("processTableCount too large: %u", processTableCount);
-        return;
-    }
     for (uint32_t i = 0; i < processTableCount; ++i) {
         UniStackTableInfo& stackTable = uniStackTableInfos_.emplace_back();
         Read(stackTable.pid);
@@ -347,10 +347,6 @@ PerfFileSectionUniStackTable::PerfFileSectionUniStackTable(const FEATURE id, con
         HLOGV("tableSize %" PRIu32 " ", stackTable.tableSize);
         Read(stackTable.numNodes);
         HLOGV("numNodes %" PRIu32 " ", stackTable.numNodes);
-        if (stackTable.numNodes > MAX_VECTOR_RESIZE_COUNT) {
-            HLOGE("numNodes too large: %u", stackTable.numNodes);
-            return;
-        }
         for (size_t j = 0; j < stackTable.numNodes; j++) {
             UniStackNode& node = stackTable.nodes.emplace_back();
             Read(node.index);
@@ -507,7 +503,6 @@ PerfFileSectionEventDesc::PerfFileSectionEventDesc(const FEATURE id, const char 
             return;
         } else if (nrIds > maxIds) {
             HLOGW("nrIds is too large ! %u", nrIds);
-            return;
         }
         CHECK_TRUE(Read(eventDesc.name), NO_RETVAL, 0, "");
         HIPERF_ASSERT(nrIds <= MAX_VECTOR_RESIZE_COUNT, "nrIds exceeds 100000\n");

@@ -887,11 +887,7 @@ bool SubCommandRecord::ParseDataLimitOption(const std::string &str)
         return false;
     }
 
-    if (size != 0 && unit > UINT64_MAX / size) {
-        dataSizeLimit_ = UINT64_MAX;
-    } else {
-        dataSizeLimit_ = size * unit;
-    }
+    dataSizeLimit_ = size * unit;
 
     return true;
 }
@@ -1029,13 +1025,7 @@ bool SubCommandRecord::SetPerfMaxSampleRate()
 bool SubCommandRecord::SetPerfEventMlock()
 {
     auto cmp = [](int oldValue, int newValue) { return oldValue == newValue; };
-    long ncpu = sysconf(_SC_NPROCESSORS_CONF);
-    int64_t mlockCalc = static_cast<int64_t>(ncpu) * (static_cast<int64_t>(mmapPages_) + 1) * 4;
-    if (mlockCalc < 0 || mlockCalc > INT_MAX) {
-        HLOGE("mlock size overflow");
-        return false;
-    }
-    int mlock_kb = static_cast<int>(mlockCalc);
+    int mlock_kb = sysconf(_SC_NPROCESSORS_CONF) * (mmapPages_ + 1) * 4;
     return SetPerfLimit(PERF_EVENT_MLOCK_KB, mlock_kb, cmp, "hiviewdfx.hiperf.perf_event_mlock_kb");
 }
 
@@ -2054,9 +2044,7 @@ uint32_t SubCommandRecord::GetCountFromFile(const std::string &fileName)
         bool ret1 = IsStringToIntSuccess(vSubstr[1], num1);
         bool ret2 = IsStringToIntSuccess(vSubstr[0], num2);
         if (ret1 && ret2) {
-            if (num1 >= num2) {
-                ret += static_cast<uint32_t>(num1 - num2);
-            }
+            ret += static_cast<uint32_t>(num1 - num2);
         }
     }
     return ret;
@@ -2550,9 +2538,6 @@ void SubCommandRecord::CollectSymbol(PerfRecordSample *sample)
         return;
     }
 
-    if (sample->data_.nr > RECORD_SIZE_LIMIT / sizeof(u64)) {
-        return;
-    }
     for (u64 i = 0; i < sample->data_.nr; i++) {
         if (sample->data_.ips[i] >= PERF_CONTEXT_MAX) {
             if (sample->data_.ips[i] == PERF_CONTEXT_KERNEL) {
@@ -2973,9 +2958,6 @@ void SubCommandRecord::UpdateDevHostCallChains(PerfEventRecord& record)
         serverPid = static_cast<uint32_t>(sample->GetServerPidof(0));
         if (rootPids_.find(serverPid) != rootPids_.end()) {
             sample->data_.ip += offset_;
-        }
-        if (sample->data_.nr > RECORD_SIZE_LIMIT / sizeof(u64)) {
-            return;
         }
         for (u64 i = 0; i < sample->data_.nr; i++) {
             if (sample->data_.ips[i] >= PERF_CONTEXT_MAX || sample->data_.ips[i] < BAD_IP_ADDRESS) {

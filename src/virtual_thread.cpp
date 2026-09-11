@@ -171,7 +171,7 @@ bool VirtualThread::ReadRoMemory(uint64_t vaddr, uint8_t *data, const size_t siz
             const_cast<VirtualThread *>(this)->vaddr4kPageCache_[pageIndex] = memMapIndex;
         }
     }
-    if (memMapIndex != illegal && memMapIndex < memMaps_.size()) {
+    if (memMapIndex != illegal) {
         auto map = memMaps_[memMapIndex];
         if (map != nullptr) {
             if (map->elf == nullptr) {
@@ -273,9 +273,7 @@ void VirtualThread::ParseServiceMap(const std::string &filename)
             break;
         }
     }
-    if (end >= begin) {
-        CreateMapItem(filename, begin, end - begin, 0);
-    }
+    CreateMapItem(filename, begin, end - begin, 0);
 }
 
 void VirtualThread::ParseDevhostMapEachLine(std::string &filename, std::istringstream &iStringstream,
@@ -328,9 +326,7 @@ void VirtualThread::ParseDevhostMapEachLine(std::string &filename, std::istrings
         // '/lib/libdh-linux.so.5.10.97-oh' to '/lib/libdh-linux.so'
         filename = DEVHOST_LINUX_FILE_NAME;
     }
-    if (end >= begin) {
-        CreateMapItem(filename, begin, end - begin, offset);
-    }
+    CreateMapItem(filename, begin, end - begin, offset);
 }
 
 void VirtualThread::ParseDevhostMap(const pid_t devhost)
@@ -366,10 +362,6 @@ std::shared_ptr<DfxMap> VirtualThread::CreateMapItem(const std::string &filename
     }
     if (!OHOS::HiviewDFX::DfxMaps::IsLegalMapItem(adaptedFilename)) {
         return nullptr; // skip some memmap
-    }
-    if (len > UINT64_MAX - begin) {
-        HLOGE("begin + len overflow in CreateMapItem");
-        return nullptr;
     }
     std::shared_ptr<DfxMap> map = memMaps_.emplace_back(std::make_shared<DfxMap>(begin, begin + len, offset,
         prot, adaptedFilename));

@@ -117,14 +117,6 @@ std::string CanonicalizeSpecPath(const char* src)
     return std::string(resolvedPath);
 }
 
-uint32_t RoundUp(const uint32_t x, const int align)
-{
-    if (x > UINT32_MAX - static_cast<uint32_t>(align)) {
-        return x;
-    }
-    return (((x) + (align) >= 1 ? (x) + (align) - 1 : 0) / (align)) * (align);
-}
-
 std::string StringReplace(std::string source, const std::string &from, const std::string &to)
 {
     size_t pos = 0;
@@ -236,12 +228,6 @@ std::string StdoutRecord::Stop()
     // return file content
     if (recordFile_ != nullptr) {
         const long fileLength = lseek(fileno(recordFile_), 0, SEEK_END);
-        if (fileLength < 0) {
-            HLOGE("lseek failed to get file length");
-            std::fclose(recordFile_);
-            recordFile_ = nullptr;
-            return content_;
-        }
         content_.resize(fileLength);
         lseek(fileno(recordFile_), 0, SEEK_SET);
         const long len = read(fileno(recordFile_), content_.data(), fileLength);

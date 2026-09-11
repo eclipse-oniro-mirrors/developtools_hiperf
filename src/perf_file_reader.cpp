@@ -121,10 +121,7 @@ bool PerfFileReader::ReadFileHeader()
     if (Read(&header_, sizeof(header_))) {
         dataSectionSize_ = header_.data.size;
         if (IsValidDataFile()) {
-            if (header_.data.offset > UINT64_MAX - header_.data.size) {
-                HLOGE("data offset + size overflow");
-                return false;
-            }
+            CHECK_TRUE(header_.data.offset <= UINT64_MAX - header_.data.size, false, 1, "data offset + size overflow");
             featureSectionOffset_ = header_.data.offset + header_.data.size;
             for (int i = 0; i < FETURE_MAX / SIZE_FETURE_COUNT; i++) {
                 std::bitset<SIZE_FETURE_COUNT> features(header_.features[i]);
@@ -194,10 +191,7 @@ bool PerfFileReader::ReadAttrSection()
 bool PerfFileReader::ReadIdsForAttr(const perf_file_attr &attr, std::vector<uint64_t> *ids)
 {
     if (attr.ids.size > 0) {
-        if (attr.ids.size > SIZE_MAX - sizeof(uint64_t) + 1) {
-            HLOGE("attr.ids.size too large");
-            return false;
-        }
+        CHECK_TRUE(attr.ids.size <= SIZE_MAX - sizeof(uint64_t) + 1, false, 1, "attr.ids.size too large");
         size_t count = (attr.ids.size + sizeof(uint64_t) - 1) / sizeof(uint64_t);
         if (count > MAX_VECTOR_RESIZE_COUNT) {
             HLOGE("count(%zu) out of range", count);
@@ -301,9 +295,7 @@ bool PerfFileReader::ReadRecordByAttr(ProcessRecordCB &callback, uint8_t *buf,
         return false;
     }
     HLOGV("record type %u", record.GetType());
-    if (remainingSize < header->size + speSize) {
-        return false;
-    }
+    CHECK_TRUE(remainingSize >= header->size + speSize, false, 1, "remainingSize < header->size + speSize");
     remainingSize = remainingSize - header->size - speSize;
 #ifdef HIPERF_DEBUG_TIME
     const auto startCallbackTime = steady_clock::now();

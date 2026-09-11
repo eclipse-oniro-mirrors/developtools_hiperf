@@ -34,8 +34,7 @@ const std::string DwarfEncoding::ToString() const
 
     size_t size = GetSize();
     const unsigned char *data = data_;
-    size_t maxRead = std::min(size, static_cast<size_t>(256));
-    while (maxRead-- > 0) {
+    while (size-- > 0) {
         debugString.append(ToHex(data[0]) + " ");
         data++;
     }

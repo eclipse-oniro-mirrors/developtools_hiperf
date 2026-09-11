@@ -90,10 +90,7 @@ bool CallStack::UnwindCallStack(const VirtualThread &thread, const bool abi32, u
         HLOGE("RegisterGetSPValue failed");
         return false;
     } else {
-        if (stackSize_ > UINT64_MAX - stackPoint_) {
-            HLOGE("stackPoint + stackSize overflow");
-            return false;
-        }
+        CHECK_TRUE(stackSize_ <= UINT64_MAX - stackPoint_, false, 1, "stackPoint + stackSize overflow");
         stackEnd_ = stackPoint_ + stackSize_;
     }
 
