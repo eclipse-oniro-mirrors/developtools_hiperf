@@ -178,13 +178,17 @@ bool PerfFileWriter::ReadRecords(ProcessRecordCB &callback)
         size_t headerSize = sizeof(perf_event_header);
         if (remainingSize >= header->size && Read(buf + headerSize, header->size - headerSize)) {
             size_t speSize = 0;
+            struct PerfRecordAuxtraceData *auxtrace = nullptr;
             if (header->type == PERF_RECORD_AUXTRACE) {
-                struct PerfRecordAuxtraceData *auxtrace =
-                    reinterpret_cast<struct PerfRecordAuxtraceData *>(header + 1);
+                auxtrace = reinterpret_cast<struct PerfRecordAuxtraceData *>(header + 1);
                 speSize = auxtrace->size;
-                if (speSize > 0) {
-                    Read(buf + header->size, auxtrace->size);
-                }
+            }
+            if (speSize > 0 && header->size + speSize > RECORD_SIZE_LIMIT_SPE) {
+                HLOGE("auxtrace size %zu too large, skip", speSize);
+                speSize = 0;
+            }
+            if (speSize > 0) {
+                Read(buf + header->size, speSize);
             }
             uint8_t *data = buf;
             // the record is allowed from a cache memory, does not free memory after use
@@ -192,6 +196,9 @@ bool PerfFileWriter::ReadRecords(ProcessRecordCB &callback)
                 static_cast<perf_event_type>(header->type), data, defaultEventAttr_);
             // skip unknown record
             CHECK_TRUE(record.GetName() != nullptr, true, 0, "");
+            if (remainingSize < header->size + speSize) {
+                return false;
+            }
             remainingSize = remainingSize - header->size - speSize;
             // call callback to process, do not destroy the record
             callback(record);

@@ -262,8 +262,9 @@ static int SpePktOutString(int *err, char **bufPtr, size_t *bufLen,
     if (err && *err) {
         return *err;
     }
-    if (*bufLen - 1 < 0) {
-        HLOGW("SpePktOutString failed, bufLen: %d", static_cast<int>(*bufLen));
+    if (*bufLen == 0) {
+        HLOGW("SpePktOutString failed, bufLen is 0");
+        return -1;
     }
     va_start(args, fmt);
     ret = vsnprintf_s(*bufPtr, *bufLen, *bufLen - 1, fmt, args);
@@ -632,6 +633,9 @@ static int SpeGetNextPacket(struct SpeDecoder *decoder)
         if (ret <= 0) {
             /* Move forward for 1 byte */
             decoder->buf += 1;
+            if (decoder->len == 0) {
+                return -EBADMSG;
+            }
             decoder->len -= 1;
             return -EBADMSG;
         }
@@ -898,6 +902,9 @@ void UpdateHeating()
 {
     for (auto it = AuxRawDataMap_.begin(); it != AuxRawDataMap_.end(); it++) {
         u64 cc = typeCount[it->first];
+        if (cc == 0) {
+            continue;
+        }
         for (auto& it2 : it->second) {
             float heating = (float)it2.second.count / cc * FULL_PERCENTAGE;
             HLOGV("heating %llu/%llu %f", it2.second.count, cc, heating);

@@ -312,6 +312,11 @@ protected:
         if (elfFile_->GetSectionInfo(shinfo, ".eh_frame_hdr")) {
             auto mmapPtr = elfFile_->GetMmapPtr();
             CHECK_TRUE(mmapPtr != nullptr, false, 1, "mmapPtr should not be nullptr.");
+            if (shinfo.offset > elfFile_->GetMmapSize() ||
+                shinfo.size > elfFile_->GetMmapSize() - shinfo.offset) {
+                HLOGE("eh_frame_hdr section out of mmap bounds");
+                return false;
+            }
             LoadEhFrameHDR(mmapPtr + shinfo.offset, shinfo.size, shinfo.offset);
         }
 #endif
@@ -367,7 +372,7 @@ private:
             HLOGE("mmapPtr should not be nullptr.");
             return false;
         }
-        if (!LoadEhFrameHDR(mmapPtr + shinfo.offset, elfFile_->GetMmapSize(), shinfo.offset)) {
+        if (!LoadEhFrameHDR(mmapPtr + shinfo.offset, elfFile_->GetMmapSize() - shinfo.offset, shinfo.offset)) {
             HLOGW("Failed to load eh_frame_hdr");
             return false;
         }
@@ -538,6 +543,9 @@ private:
                 = ip offset (ip always in exec file offset)
             5. ip offset + exec begin vaddr(2c5000) = virtual ip in elf
         */
+        if (ip < mapStart) {
+            return 0;
+        }
         uint64_t vaddr = ip - mapStart + mapPageOffset - textExecVaddrFileOffset_ + textExecVaddr_;
         HLOGM(" ip :0x%016" PRIx64 " -> elf offset :0x%016" PRIx64 " -> vaddr :0x%016" PRIx64 " ",
               ip, ip - mapStart + mapPageOffset, vaddr);
@@ -580,6 +588,10 @@ public:
             lineEnd = *dataEnd;
         }
         size_t lineSize = (lineEnd != nullptr) ? (lineEnd - *lineBegin) : (*dataEnd - *lineBegin);
+        constexpr size_t maxKsymsLineSize = 4096;
+        if (lineSize > maxKsymsLineSize) {
+            lineSize = maxKsymsLineSize;
+        }
 
         const auto eachLineStartTime = std::chrono::steady_clock::now();
         lines++;

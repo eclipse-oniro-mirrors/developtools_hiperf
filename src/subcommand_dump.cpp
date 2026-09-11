@@ -16,6 +16,7 @@
 
 #include "subcommand_dump.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cinttypes>
 #include <cstring>
@@ -434,6 +435,10 @@ void SubCommandDump::ExportUserStack(const PerfRecordSample &recordSample)
         FILE *userRegsFp = fopen(resolvedPath.c_str(), "wb");
         CHECK_TRUE(userRegsFp != nullptr, NO_RETVAL, 1, "open userRegs failed");
         std::unique_ptr<FILE, decltype(&fclose)> fpUserRegs(userRegsFp, fclose);
+        if (recordSample.data_.reg_nr > RECORD_SIZE_LIMIT / sizeof(u64)) {
+            HLOGE("reg_nr too large: %llu", (unsigned long long)recordSample.data_.reg_nr);
+            return;
+        }
         fwrite(recordSample.data_.user_regs, sizeof(u64), recordSample.data_.reg_nr,
                fpUserRegs.get());
 
@@ -444,6 +449,10 @@ void SubCommandDump::ExportUserStack(const PerfRecordSample &recordSample)
         FILE *UserDataFp = fopen(resolvePath.c_str(), "wb");
         CHECK_TRUE(UserDataFp != nullptr, NO_RETVAL, 1, "open UserData failed");
         std::unique_ptr<FILE, decltype(&fclose)> fpUserData(UserDataFp, fclose);
+        if (recordSample.data_.dyn_size > RECORD_SIZE_LIMIT_SPE) {
+            HLOGE("dyn_size too large: %llu", (unsigned long long)recordSample.data_.dyn_size);
+            return;
+        }
         fwrite(recordSample.data_.stack_data, sizeof(u8), recordSample.data_.dyn_size,
                fpUserData.get());
     }
@@ -465,7 +474,8 @@ void SubCommandDump::ExportUserData(PerfEventRecord& record)
         std::unique_ptr<FILE, decltype(&fclose)> fpUserData(fopen(resolvedPath.c_str(), "wb"), fclose);
         static std::vector<u8> buf(RECORD_SIZE_LIMIT);
         CHECK_TRUE(recordSample->GetBinary(buf), NO_RETVAL, 1, "export user sample data failed");
-        fwrite(buf.data(), sizeof(u8), recordSample->GetSize(), fpUserData.get());
+        size_t writeSize = std::min(recordSample->GetSize(), buf.size());
+        fwrite(buf.data(), sizeof(u8), writeSize, fpUserData.get());
 
         HLOGD("export user data index %d time %llu", exportSampleIndex_, recordSample->data_.time);
     }

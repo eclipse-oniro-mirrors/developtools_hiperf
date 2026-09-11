@@ -119,6 +119,9 @@ std::string CanonicalizeSpecPath(const char* src)
 
 uint32_t RoundUp(const uint32_t x, const int align)
 {
+    if (x > UINT32_MAX - static_cast<uint32_t>(align)) {
+        return x;
+    }
     return (((x) + (align) >= 1 ? (x) + (align) - 1 : 0) / (align)) * (align);
 }
 
@@ -233,6 +236,12 @@ std::string StdoutRecord::Stop()
     // return file content
     if (recordFile_ != nullptr) {
         const long fileLength = lseek(fileno(recordFile_), 0, SEEK_END);
+        if (fileLength < 0) {
+            HLOGE("lseek failed to get file length");
+            std::fclose(recordFile_);
+            recordFile_ = nullptr;
+            return content_;
+        }
         content_.resize(fileLength);
         lseek(fileno(recordFile_), 0, SEEK_SET);
         const long len = read(fileno(recordFile_), content_.data(), fileLength);
@@ -704,7 +713,7 @@ bool HexDump(const void *buf, const size_t size, const size_t maxSize)
         outputBytes = std::min(size, maxSize);
     }
 
-    for (size_t i = 0; i <= outputBytes; i += dumpByteEachLine) {
+    for (size_t i = 0; i < outputBytes; i += dumpByteEachLine) {
         HLOGM(" %02zu: %s ", i, BufferToHexString(byteBuf, dumpByteEachLine).c_str());
         byteBuf += dumpByteEachLine;
     }

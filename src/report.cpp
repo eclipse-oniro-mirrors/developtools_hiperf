@@ -152,6 +152,9 @@ void Report::AddReportItemBranch(const PerfRecordSample &sample)
     size_t configIndex = GetConfigIndex(sample.data_.id);
     HLOG_ASSERT(configs_.size() > configIndex);
     VirtualThread &thread = virtualRuntime_.GetThread(sample.data_.pid, sample.data_.tid);
+    if (sample.data_.bnr > RECORD_SIZE_LIMIT / sizeof(PerfBranchEntry)) {
+        return;
+    }
     for (u64 i = 0; i < sample.data_.bnr; i++) {
         DfxSymbol symbolTo =
             virtualRuntime_.GetSymbol(sample.data_.lbr[i].to, sample.data_.pid, sample.data_.tid);

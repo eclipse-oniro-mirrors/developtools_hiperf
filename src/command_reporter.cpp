@@ -50,6 +50,11 @@ void CommandReporter::ReportCommand()
     static const char* const ERROR_MESSAGE[] = {
         MAKE_ERROR_ITEM(FOR_ERROR_NAME)
     };
+    const char* errorMessage = "unknown error";
+    if (errorCode >= 0 &&
+        errorCode < static_cast<int32_t>(sizeof(ERROR_MESSAGE) / sizeof(ERROR_MESSAGE[0]))) {
+        errorMessage = ERROR_MESSAGE[errorCode];
+    }
     int32_t ret = HiSysEventWrite(
         OHOS::HiviewDFX::HiSysEvent::Domain::PROFILER, "HIPERF_USAGE",
         OHOS::HiviewDFX::HiSysEvent::EventType::BEHAVIOR,
@@ -58,7 +63,7 @@ void CommandReporter::ReportCommand()
         "CALLER", caller_,
         "TARGET_PROCESS", targetProcess_,
         "ERROR_CODE", errorCode,
-        "ERROR_MESSAGE", ERROR_MESSAGE[errorCode]);
+        "ERROR_MESSAGE", errorMessage);
     if (ret != 0) {
         HIPERF_HILOGE(MODULE_DEFAULT, "hisysevent report failed, err:%{public}d", ret);
     }

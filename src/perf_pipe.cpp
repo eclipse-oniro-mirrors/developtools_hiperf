@@ -165,9 +165,10 @@ void PerfPipe::WaitFifoReply(const int fd, const std::chrono::milliseconds &time
                 HIPERF_HILOGE(MODULE_DEFAULT, "[WaitFifoReply] read from fifo file(%{public}s) failed",
                     fifoFileS2C_.c_str());
                 exitLoop = true;
+                continue;
             }
             reply.push_back(c);
-            if (c == '\n') {
+            if (c == '\n' || reply.size() > ERRINFOLEN) {
                 exitLoop = true;
             }
         }

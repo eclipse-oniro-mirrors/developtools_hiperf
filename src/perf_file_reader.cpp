@@ -121,6 +121,10 @@ bool PerfFileReader::ReadFileHeader()
     if (Read(&header_, sizeof(header_))) {
         dataSectionSize_ = header_.data.size;
         if (IsValidDataFile()) {
+            if (header_.data.offset > UINT64_MAX - header_.data.size) {
+                HLOGE("data offset + size overflow");
+                return false;
+            }
             featureSectionOffset_ = header_.data.offset + header_.data.size;
             for (int i = 0; i < FETURE_MAX / SIZE_FETURE_COUNT; i++) {
                 std::bitset<SIZE_FETURE_COUNT> features(header_.features[i]);
@@ -157,6 +161,7 @@ bool PerfFileReader::ReadAttrSection()
         // size of perf_event_attr change between different linux kernel versions.
         // can not memcpy to perf_file_attr as a whole
         perf_file_attr attr {};
+        CHECK_TRUE(header_.attrSize >= sizeof(attr.ids), false, 1, "attrSize too small");
         size_t attrSize = header_.attrSize - sizeof(attr.ids);
 
         // If the size is smaller, you can use a pointer to point directly.
@@ -189,6 +194,10 @@ bool PerfFileReader::ReadAttrSection()
 bool PerfFileReader::ReadIdsForAttr(const perf_file_attr &attr, std::vector<uint64_t> *ids)
 {
     if (attr.ids.size > 0) {
+        if (attr.ids.size > SIZE_MAX - sizeof(uint64_t) + 1) {
+            HLOGE("attr.ids.size too large");
+            return false;
+        }
         size_t count = (attr.ids.size + sizeof(uint64_t) - 1) / sizeof(uint64_t);
         if (count > MAX_VECTOR_RESIZE_COUNT) {
             HLOGE("count(%zu) out of range", count);
@@ -248,8 +257,9 @@ void PerfFileReader::ReadSpeRecord(perf_event_header *header, uint8_t *buf, size
     CHECK_TRUE(header != nullptr && buf != nullptr, NO_RETVAL, 0, "");
     struct PerfRecordAuxtraceData *auxtrace =
         reinterpret_cast<struct PerfRecordAuxtraceData *>(header + 1);
-    speSize = auxtrace->size;
-    if (speSize > 0 && header->size + auxtrace->size <= RECORD_SIZE_LIMIT_SPE) {
+    speSize = 0;
+    if (auxtrace->size > 0 && header->size + auxtrace->size <= RECORD_SIZE_LIMIT_SPE) {
+        speSize = auxtrace->size;
         Read(buf + header->size, auxtrace->size);
     }
 }
@@ -291,6 +301,9 @@ bool PerfFileReader::ReadRecordByAttr(ProcessRecordCB &callback, uint8_t *buf,
         return false;
     }
     HLOGV("record type %u", record.GetType());
+    if (remainingSize < header->size + speSize) {
+        return false;
+    }
     remainingSize = remainingSize - header->size - speSize;
 #ifdef HIPERF_DEBUG_TIME
     const auto startCallbackTime = steady_clock::now();

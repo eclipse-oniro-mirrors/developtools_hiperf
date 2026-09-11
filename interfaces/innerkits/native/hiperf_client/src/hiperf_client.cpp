@@ -546,16 +546,17 @@ bool Client::Start(const RecordOption &option)
 void Client::ChildRunExecv(std::vector<std::string> &cmd)
 {
     // conver vector to array for execvp()
-    char *argv[cmd.size() + SIZE_ARGV_TAIL];
+    std::vector<char *> argv;
+    argv.reserve(cmd.size() + SIZE_ARGV_TAIL);
     size_t i = 0;
     for (i = 0; i < cmd.size(); ++i) {
         HIPERF_HILOGI(MODULE_CPP_API, "args %" HILOG_PUBLIC "zu : %" HILOG_PUBLIC "s", i,
                         cmd[i].c_str());
-        argv[i] = cmd[i].data();
+        argv.push_back(cmd[i].data());
     }
-    argv[i] = nullptr;
+    argv.push_back(nullptr);
 
-    execv(argv[0], argv);
+    execv(argv[0], argv.data());
 
     // never reach the following line, unless calling of execv function failed.
     char errInfo[ERRINFOLEN] = { 0 };
