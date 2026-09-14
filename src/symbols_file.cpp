@@ -541,7 +541,9 @@ private:
                 = ip offset (ip always in exec file offset)
             5. ip offset + exec begin vaddr(2c5000) = virtual ip in elf
         */
-        if (ip < mapStart) return 0;
+        if (ip < mapStart) {
+            return 0;
+        }
         uint64_t vaddr = ip - mapStart + mapPageOffset - textExecVaddrFileOffset_ + textExecVaddr_;
         HLOGM(" ip :0x%016" PRIx64 " -> elf offset :0x%016" PRIx64 " -> vaddr :0x%016" PRIx64 " ",
               ip, ip - mapStart + mapPageOffset, vaddr);
