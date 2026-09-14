@@ -15,6 +15,7 @@
 #define HILOG_TAG "Protobuf"
 
 #include "report_protobuf_file.h"
+#include "hiperf_hilog.h"
 #include "utilities.h"
 
 using namespace Proto;
