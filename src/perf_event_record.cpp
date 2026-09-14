@@ -615,16 +615,15 @@ void PerfRecordSample::ParseSampleReadData(uint8_t *&p, u64 &dataSize)
         PopFromBinary(true, p, data_.read_nr, dataSize);
         PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.read_time_enabled, dataSize);
         PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.read_time_running, dataSize);
-        if (data_.read_nr > 0) {
-            data_.read_values = reinterpret_cast<u64 *>(p);
-            if (readFormat_ & PERF_FORMAT_ID) {
-                // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
-                data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
-                if (!SafeSetPointerOffset(p, data_.read_nr,
-                    sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize)) return;
-            } else {
-                if (!SafeSetPointerOffset(p, data_.read_nr, sizeof(u64), dataSize)) return;
-            }
+        if (data_.read_nr == 0) return;
+        data_.read_values = reinterpret_cast<u64 *>(p);
+        if (readFormat_ & PERF_FORMAT_ID) {
+            // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
+            data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
+            if (!SafeSetPointerOffset(p, data_.read_nr,
+                sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize)) return;
+        } else {
+            if (!SafeSetPointerOffset(p, data_.read_nr, sizeof(u64), dataSize)) return;
         }
         return;
     }
