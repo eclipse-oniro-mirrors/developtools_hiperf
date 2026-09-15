@@ -335,7 +335,6 @@ bool PerfRecordMmap::GetBinary(std::vector<uint8_t> &buf) const
         HIPERF_HILOGE(MODULE_DEFAULT, "copySize %{public}zu exceeds sizeof(data_) %{public}zu",
                       copySize, sizeof(data_));
 #endif
-        return false;
     }
     if (memcpy_s(p, bufSize, reinterpret_cast<const uint8_t *>(&data_), copySize) != 0) {
         HLOGE("memcpy_s failed copySize %zu", copySize);
@@ -453,7 +452,6 @@ bool PerfRecordMmap2::GetBinary(std::vector<uint8_t> &buf) const
         HIPERF_HILOGE(MODULE_DEFAULT, "copySize %{public}zu exceeds sizeof(data_) %{public}zu",
                       copySize, sizeof(data_));
 #endif
-        return false;
     }
     if (memcpy_s(p, bufSize, reinterpret_cast<const uint8_t *>(&data_), copySize) != 0) {
         HLOGE("memcpy_s failed copySize %zu", copySize);
@@ -546,7 +544,6 @@ bool PerfRecordComm::GetBinary(std::vector<uint8_t> &buf) const
         HIPERF_HILOGE(MODULE_DEFAULT, "copySize %{public}zu exceeds sizeof(data_) %{public}zu",
                       copySize, sizeof(data_));
 #endif
-        return false;
     }
     if (memcpy_s(p, bufSize, reinterpret_cast<const uint8_t *>(&data_), copySize) != 0) {
         HLOGE("memcpy_s failed copySize %zu", copySize);
@@ -595,16 +592,15 @@ void PerfRecordSample::ParseSampleReadData(uint8_t *&p, u64 &dataSize)
         PopFromBinary(true, p, data_.read_nr, dataSize);
         PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_ENABLED, p, data_.read_time_enabled, dataSize);
         PopFromBinary(readFormat_ & PERF_FORMAT_TOTAL_TIME_RUNNING, p, data_.read_time_running, dataSize);
-        if (data_.read_nr == 0) {
-            return;
-        }
-        data_.read_values = reinterpret_cast<u64 *>(p);
-        if (readFormat_ & PERF_FORMAT_ID) {
-            // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
-            data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
-            SetPointerOffset(p, data_.read_nr * sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize);
-        } else {
-            SetPointerOffset(p, data_.read_nr * sizeof(u64), dataSize);
+        if (data_.read_nr > 0) {
+            data_.read_values = reinterpret_cast<u64 *>(p);
+            if (readFormat_ & PERF_FORMAT_ID) {
+                // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
+                data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
+                SetPointerOffset(p, data_.read_nr * sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize);
+            } else {
+                SetPointerOffset(p, data_.read_nr * sizeof(u64), dataSize);
+            }
         }
         return;
     }
