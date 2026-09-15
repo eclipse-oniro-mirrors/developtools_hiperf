@@ -126,31 +126,11 @@ inline void PopFromBinary2(const bool condition, uint8_t*& p, T1& v1, T2& v2, u6
     }
 }
 
-static inline bool SafeMulU64(u64 a, u64 b, u64 &result)
-{
-    if (a != 0 && b > UINT64_MAX / a) {
-        return false;
-    }
-    result = a * b;
-    return true;
-}
-
 inline void SetPointerOffset(uint8_t*& p, u64 offset, u64& size)
 {
     HIPERF_ASSERT(offset <= size && offset <= RECORD_SIZE_LIMIT, "SetPointerOffset error\n");
     size -= offset;
     p += offset;
-}
-
-static inline bool SafeSetPointerOffset(uint8_t*& p, u64 count, u64 elemSize, u64& dataSize)
-{
-    u64 mulResult = 0;
-    if (!SafeMulU64(count, elemSize, mulResult)) {
-        HLOGE("multiply overflow");
-        return false;
-    }
-    SetPointerOffset(p, mulResult, dataSize);
-    return true;
 }
 
 void PerfEventRecord::GetHeaderBinary(std::vector<uint8_t> &buf) const
@@ -622,10 +602,9 @@ void PerfRecordSample::ParseSampleReadData(uint8_t *&p, u64 &dataSize)
         if (readFormat_ & PERF_FORMAT_ID) {
             // In PERF_FORMAT_GROUP mode, each event entry is [value, id] interleaved.
             data_.read_ids = reinterpret_cast<u64 *>(p + sizeof(u64));
-            if (!SafeSetPointerOffset(p, data_.read_nr,
-                sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize)) return;
+            SetPointerOffset(p, data_.read_nr * sizeof(u64) * GROUP_READ_VALUE_ID_STRIDE, dataSize);
         } else {
-            if (!SafeSetPointerOffset(p, data_.read_nr, sizeof(u64), dataSize)) return;
+            SetPointerOffset(p, data_.read_nr * sizeof(u64), dataSize);
         }
         return;
     }
@@ -647,7 +626,7 @@ void PerfRecordSample::ParseSampleTailData(uint8_t *&p, const perf_event_attr &a
     if (data_.nr > 0) {
         // the pointer is from input(p), require caller keep input(p) with *this together
         data_.ips = reinterpret_cast<u64 *>(p);
-        if (!SafeSetPointerOffset(p, data_.nr, sizeof(u64), dataSize)) return;
+        SetPointerOffset(p, data_.nr * sizeof(u64), dataSize);
     }
     PopFromBinary(sampleType_ & PERF_SAMPLE_RAW, p, data_.raw_size, dataSize);
     if (data_.raw_size > 0) {
@@ -657,7 +636,7 @@ void PerfRecordSample::ParseSampleTailData(uint8_t *&p, const perf_event_attr &a
     PopFromBinary(sampleType_ & PERF_SAMPLE_BRANCH_STACK, p, data_.bnr, dataSize);
     if (data_.bnr > 0) {
         data_.lbr = reinterpret_cast<PerfBranchEntry *>(p);
-        if (!SafeSetPointerOffset(p, data_.bnr, sizeof(PerfBranchEntry), dataSize)) return;
+        SetPointerOffset(p, data_.bnr * sizeof(PerfBranchEntry), dataSize);
     }
     PopFromBinary(sampleType_ & PERF_SAMPLE_REGS_USER, p, data_.user_abi, dataSize);
     if (data_.user_abi > 0) {
@@ -669,7 +648,7 @@ void PerfRecordSample::ParseSampleTailData(uint8_t *&p, const perf_event_attr &a
     PopFromBinary(sampleType_ & PERF_SAMPLE_SERVER_PID, p, data_.server_nr, dataSize);
     if (data_.server_nr > 0) {
         data_.server_pids = reinterpret_cast<u64 *>(p);
-        if (!SafeSetPointerOffset(p, data_.server_nr, sizeof(u64), dataSize)) return;
+        SetPointerOffset(p, data_.server_nr * sizeof(u64), dataSize);
     }
     PopFromBinary(sampleType_ & PERF_SAMPLE_STACK_USER, p, data_.stack_size, dataSize);
     if (data_.stack_size > 0) {
