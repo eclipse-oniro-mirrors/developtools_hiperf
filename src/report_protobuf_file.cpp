@@ -116,7 +116,7 @@ bool ReportProtobufFileWriter::ProcessRecord(const PerfEventRecord &record)
     if (record.GetType() == PERF_RECORD_SAMPLE) {
         HLOGF("record.GetType() == PERF_RECORD_SAMPLE");
     } else if (record.GetType() == PERF_RECORD_LOST_SAMPLES) {
-        ProcessRecord(*static_cast<const PerfRecordLost *>(&record));
+        ProcessRecord(*static_cast<const PerfRecordLostSamples *>(&record));
     } else if (record.GetType() == PERF_RECORD_COMM) {
         ProcessRecord(*static_cast<const PerfRecordComm *>(&record));
     } else {
@@ -172,6 +172,13 @@ bool ReportProtobufFileWriter::ProcessRecord(const PerfRecordLost &recordLost)
 {
     recordLost.DumpLog(__FUNCTION__);
     recordLost_ += recordLost.data_.lost;
+    return true;
+}
+
+bool ReportProtobufFileWriter::ProcessRecord(const PerfRecordLostSamples &recordLostSamples)
+{
+    recordLostSamples.DumpLog(__FUNCTION__);
+    recordLost_ += recordLostSamples.data_.lost;
     return true;
 }
 

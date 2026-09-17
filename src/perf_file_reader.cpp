@@ -164,8 +164,9 @@ bool PerfFileReader::ReadAttrSection()
         // If the size is smaller, you can use a pointer to point directly.
         // Our UAPI is 4.19. is less than 5.1
         if (header_.attrSize < sizeof(perf_event_attr)) {
-            HLOGE("size not match, ptr of perf_event_attr maybe overfollow %zu vs %zu",
-                  sizeof(perf_event_attr), attrSize);
+            HLOGE("attrSize %" PRId64 " less than perf_event_attr size %zu, reject file",
+                  header_.attrSize, sizeof(perf_event_attr));
+            return false;
         }
 
         attr.attr = *(reinterpret_cast<perf_event_attr *>(&buf[0]));
