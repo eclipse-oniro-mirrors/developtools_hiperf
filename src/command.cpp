@@ -88,12 +88,7 @@ bool Command::DispatchCommands(std::vector<std::string> arguments)
             arguments.erase(arguments.begin());
 
             if (!commandOption->callBackFunction(arguments)) {
-                if (!arguments.empty()) {
-                    printf("unknown options: %s\nUse the help command to view help.\n",
-                           arguments.front().c_str());
-                } else {
-                    printf("invalid option.\nUse the help command to view help.\n");
-                }
+                printf("unknown options: %s\nUse the help command to view help.\n", arguments.front().c_str());
                 return false;
             }
             // goto next args
