@@ -37,10 +37,11 @@ static const std::vector<std::string> FEATURE_NAMES = {
     "cache",           "sample_time",  "mem_topology", "last_feature",
 };
 static constexpr size_t MAX_VECTOR_RESIZE_COUNT = 100000;
+#ifdef FUZZER_TEST
+    // issue from fuzz test and also will lead to PerfFileSectionSymbolsFiles uncompletely construct
 static constexpr size_t MAX_SYMBOLS_FILE_NUMBER = 300;
 static constexpr size_t MAX_SYMBOLS_NUMBER = 10000;
-static constexpr size_t MAX_PROCESS_TABLE_COUNT = 1000;
-static constexpr size_t MAX_UNISTACK_NODES = 100000;
+#endif
 std::string PerfFileSection::GetFeatureName(FEATURE featureId)
 {
     unsigned int index = static_cast<unsigned int>(featureId);
@@ -247,9 +248,11 @@ void PerfFileSectionSymbolsFiles::ReadSymbolFileStructs()
     if (!Read(symbolFileNumber)) {
         HLOGE(" symbolFileNumber read failed");
         return;
+#ifdef FUZZER_TEST
     } else if (symbolFileNumber > MAX_SYMBOLS_FILE_NUMBER) {
         HLOGE(" symbolFileNumber %u too large", symbolFileNumber);
         return;
+#endif
     } else {
         HLOGV(" symbolFileNumber %u", symbolFileNumber);
     }
@@ -257,30 +260,31 @@ void PerfFileSectionSymbolsFiles::ReadSymbolFileStructs()
     for (uint32_t i = symbolFileNumber; i > 0; i--) {
         auto &symbolFileStruct = symbolFileStructs_.emplace_back();
 
-        if (!Read(symbolFileStruct.filePath_) || !Read(symbolFileStruct.symbolType_) ||
-            !Read(symbolFileStruct.textExecVaddr_) ||
-            !Read(symbolFileStruct.textExecVaddrFileOffset_) ||
-            !Read(symbolFileStruct.buildId_)) {
-            return;
-        }
+        Read(symbolFileStruct.filePath_);
         HLOGV(" symbolFileStruct.filePath_ %s", symbolFileStruct.filePath_.c_str());
+
+        Read(symbolFileStruct.symbolType_);
+        Read(symbolFileStruct.textExecVaddr_);
+        Read(symbolFileStruct.textExecVaddrFileOffset_);
+        Read(symbolFileStruct.buildId_);
 
         uint32_t symbolsNumber = 0;
         if (!Read(symbolsNumber)) {
             HLOGE(" symbols read failed");
             return;
+#ifdef FUZZER_TEST
         } else if (symbolsNumber > MAX_SYMBOLS_NUMBER) {
             HLOGE(" symbols %u too large", symbolsNumber);
             return;
+#endif
         } else {
             HLOGV(" symbols %u", symbolsNumber);
         }
         for (; symbolsNumber > 0; symbolsNumber--) {
             auto &symbolStruct = symbolFileStruct.symbolStructs_.emplace_back();
-            if (!Read(symbolStruct.vaddr_) || !Read(symbolStruct.len_) ||
-                !Read(symbolStruct.symbolName_)) {
-                return;
-            }
+            Read(symbolStruct.vaddr_);
+            Read(symbolStruct.len_);
+            Read(symbolStruct.symbolName_);
         }
         HLOGV(" %zu SymbolStruct read.", symbolFileStruct.symbolStructs_.size());
     }
@@ -333,29 +337,20 @@ PerfFileSectionUniStackTable::PerfFileSectionUniStackTable(const FEATURE id, con
     if (!Read(processTableCount)) {
         HLOGV("processTableCount read failed\n");
         return;
-    } else if (processTableCount > MAX_PROCESS_TABLE_COUNT) {
-        HLOGE("processTableCount %u too large\n", processTableCount);
-        return;
     }
     HLOGV("processTableCount %" PRIu32 "\n", processTableCount);
     for (uint32_t i = 0; i < processTableCount; ++i) {
         UniStackTableInfo& stackTable = uniStackTableInfos_.emplace_back();
-        if (!Read(stackTable.pid) || !Read(stackTable.tableSize) ||
-            !Read(stackTable.numNodes)) {
-            return;
-        }
+        Read(stackTable.pid);
         HLOGV("pid %" PRIu32 " ", stackTable.pid);
+        Read(stackTable.tableSize);
         HLOGV("tableSize %" PRIu32 " ", stackTable.tableSize);
-        if (stackTable.numNodes > MAX_UNISTACK_NODES) {
-            HLOGE("numNodes %u too large\n", stackTable.numNodes);
-            return;
-        }
+        Read(stackTable.numNodes);
         HLOGV("numNodes %" PRIu32 " ", stackTable.numNodes);
         for (size_t j = 0; j < stackTable.numNodes; j++) {
             UniStackNode& node = stackTable.nodes.emplace_back();
-            if (!Read(node.index) || !Read(node.node.value)) {
-                return;
-            }
+            Read(node.index);
+            Read(node.node.value);
         }
     }
 }
