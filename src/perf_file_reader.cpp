@@ -253,7 +253,8 @@ void PerfFileReader::ReadSpeRecord(perf_event_header *header, uint8_t *buf, size
     struct PerfRecordAuxtraceData *auxtrace =
         reinterpret_cast<struct PerfRecordAuxtraceData *>(header + 1);
     speSize = 0;
-    if (auxtrace->size > 0 && header->size + auxtrace->size <= RECORD_SIZE_LIMIT_SPE) {
+    if (auxtrace->size > 0 && auxtrace->size <= RECORD_SIZE_LIMIT_SPE &&
+        header->size <= RECORD_SIZE_LIMIT_SPE - auxtrace->size) {
         speSize = auxtrace->size;
         Read(buf + header->size, auxtrace->size);
     }
