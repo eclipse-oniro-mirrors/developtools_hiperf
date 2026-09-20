@@ -290,8 +290,8 @@ static int SpePktOutString(int &err, char *&bufPtr, size_t &bufLen,
             err = ret;
         }
     } else {
-        bufPtr += ret;
-        bufLen -= ret;
+        bufPtr += static_cast<size_t>(ret);
+        bufLen -= static_cast<size_t>(ret);
     }
 
     return ret;
