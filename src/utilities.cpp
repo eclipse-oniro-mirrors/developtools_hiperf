@@ -15,6 +15,7 @@
 
 #include "utilities.h"
 
+#include <cstdlib>
 #if defined(is_ohos) && is_ohos
 #include <sys/utsname.h>
 #endif
@@ -1414,28 +1415,64 @@ bool IsAllowSkipDeveloperMode()
 #endif
 }
 
+namespace {
+constexpr uint32_t APP_UID_THRESHOLD = 20000000;
+constexpr const char *LOCAL_OUTPUT_ROOT = "/data/local/tmp/";
+constexpr const char *SANDBOX_OUTPUT_ROOT = "/storage/Users/currentUser/";
+
+std::string JoinOutputDir(const char *dir, const std::string &fileType)
+{
+    std::string path(dir);
+    if (!path.empty() && path.back() == '/') {
+        return path + fileType;
+    }
+    return path + "/" + fileType;
+}
+} // namespace
+
+bool IsShellAppUid(uint32_t uid)
+{
+#if defined(is_sandbox_mapping) && is_sandbox_mapping
+    return uid > APP_UID_THRESHOLD;
+#else
+    static_cast<void>(uid);
+    return false;
+#endif
+}
+
+std::string BuildShellAppDefaultPath(uint32_t uid, const char *tmpDir, const std::string &fileType)
+{
+    if (uid <= APP_UID_THRESHOLD) {
+        return std::string(LOCAL_OUTPUT_ROOT) + fileType;
+    }
+    if (tmpDir == nullptr || tmpDir[0] == '\0') {
+        return std::string(SANDBOX_OUTPUT_ROOT) + fileType;
+    }
+    return JoinOutputDir(tmpDir, fileType);
+}
+
 std::string GetDefaultPathByEnv(const std::string fileType)
 {
-    std::string outputFilename = "/data/local/tmp/" + fileType;
+    std::string outputFilename = std::string(LOCAL_OUTPUT_ROOT) + fileType;
 #if defined(is_sandbox_mapping) && is_sandbox_mapping
-    if (IsHiShellLabel()) {
-        char* outputPathEnv = std::getenv("TMPDIR");
-        if (outputPathEnv != nullptr && strlen(outputPathEnv) > 0) {
-            std::string tmpFilename = outputPathEnv;
-            std::string fileName = StringEndsWith(outputFilename, "/") ? fileType : "/" + fileType;
-            tmpFilename += fileName;
-            outputFilename = CanonicalizeSpecPath(tmpFilename.c_str());
+    uint32_t uid = static_cast<uint32_t>(getuid());
+    const char *tmpDir = std::getenv("TMPDIR");
+    outputFilename = BuildShellAppDefaultPath(uid, tmpDir, fileType);
+    if (IsShellAppUid(uid)) {
+        if (tmpDir != nullptr && tmpDir[0] != '\0') {
             HIPERF_HILOGI(MODULE_DEFAULT, "get TMPDIR env success");
         } else {
-            outputFilename = "/storage/Users/currentUser/" + fileType;
             HIPERF_HILOGE(MODULE_DEFAULT, "get TMPDIR env failed");
         }
     }
 #endif
+    HIPERF_HILOGI(MODULE_DEFAULT,
+                  "HIPERF_DEFAULT_OUTPUT_PATH file=%" HILOG_PUBLIC "s path=%" HILOG_PUBLIC "s",
+                  fileType.c_str(), outputFilename.c_str());
     return outputFilename;
 }
 
-bool GetStatusLineId(const std::string& line, uint32_t& target)
+bool GetStatusLineId(const std::string &line, uint32_t &target)
 {
     size_t start = line.find_first_of("\t");
     CHECK_TRUE(start != std::string::npos, false, 1, "[GetStatusLineId] find start \t failed");
