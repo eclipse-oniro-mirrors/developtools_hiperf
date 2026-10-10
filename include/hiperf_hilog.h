@@ -16,6 +16,7 @@
 #ifndef HIPERF_HILOG
 #define HIPERF_HILOG
 
+#include <cstdint>
 #include <securec.h>
 #include <stdarg.h>
 
@@ -76,6 +77,7 @@ static constexpr OHOS::HiviewDFX::HiLogLabel HIPERF_HILOG_LABLE[] = {
 #undef LOG_DOMAIN
 #endif
 #define LOG_DOMAIN 0xD002D0D
+#define HIPERF_FD_TAG (((uint64_t)LOG_DOMAIN << 32) | 0x01)
 
 #ifdef LOG_TAG
 #undef LOG_TAG

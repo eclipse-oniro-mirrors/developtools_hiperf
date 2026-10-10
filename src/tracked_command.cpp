@@ -60,20 +60,22 @@ bool TrackedCommand::InitSignalPipes(int &startFd, int &ackFd)
     }
     startFd = startSignalPipe[0];
     startFd_ = startSignalPipe[1];
+    fdsan_exchange_owner_tag(startFd, 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(startFd_, 0, HIPERF_FD_TAG);
 
     int ackSignalPipe[2] {-1, -1};
     if (pipe2(ackSignalPipe, O_CLOEXEC) != 0) {
         HLOGE("pipe2() failed in TrackedCommand::InitSignalPipes()");
-        fdsan_exchange_owner_tag(startFd, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(startFd, LOG_DOMAIN);
-        fdsan_exchange_owner_tag(startFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(startFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(startFd, HIPERF_FD_TAG);
+        fdsan_close_with_tag(startFd_, HIPERF_FD_TAG);
         startFd = -1;
         startFd_ = -1;
         return false;
     }
     ackFd = ackSignalPipe[1];
     ackFd_ = ackSignalPipe[0];
+    fdsan_exchange_owner_tag(ackFd, 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(ackFd_, 0, HIPERF_FD_TAG);
     return true;
 }
 
@@ -91,17 +93,13 @@ bool TrackedCommand::CreateChildProcess()
         MakeInvalid();
         return false;
     } else if (pid == 0) {
-        fdsan_exchange_owner_tag(startFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(startFd_, LOG_DOMAIN);
-        fdsan_exchange_owner_tag(ackFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(ackFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(startFd_, HIPERF_FD_TAG);
+        fdsan_close_with_tag(ackFd_, HIPERF_FD_TAG);
         ExecuteCommand(startFd, ackFd);
         _exit(0);
     } else {
-        fdsan_exchange_owner_tag(startFd, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(startFd, LOG_DOMAIN);
-        fdsan_exchange_owner_tag(ackFd, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(ackFd, LOG_DOMAIN);
+        fdsan_close_with_tag(startFd, HIPERF_FD_TAG);
+        fdsan_close_with_tag(ackFd, HIPERF_FD_TAG);
         childPid_ = pid;
         state_ = State::COMMAND_WAITING;
         return true;
@@ -231,13 +229,11 @@ void TrackedCommand::MakeInvalid()
         state_ = State::COMMAND_STOPPED;
     }
     if (startFd_ != -1) {
-        fdsan_exchange_owner_tag(startFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(startFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(startFd_, HIPERF_FD_TAG);
         startFd_ = -1;
     }
     if (ackFd_ != -1) {
-        fdsan_exchange_owner_tag(ackFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(ackFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(ackFd_, HIPERF_FD_TAG);
         ackFd_ = -1;
     }
 }

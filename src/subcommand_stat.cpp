@@ -770,15 +770,18 @@ bool SubCommandStat::CreateFifoServer()
         HLOGE("fork failed. %d:%s", errno, errInfo);
         return false;
     }
-    return (pid == 0) ? HandleChildProcess() : HandleParentProcess(pid);
+    if (pid == 0) {
+        fdsan_exchange_owner_tag(STDIN_FILENO, 0, HIPERF_FD_TAG);
+        fdsan_exchange_owner_tag(STDERR_FILENO, 0, HIPERF_FD_TAG);
+        return HandleChildProcess();
+    }
+    return HandleParentProcess(pid);
 }
 
 bool SubCommandStat::HandleChildProcess()
 {
-    fdsan_exchange_owner_tag(STDIN_FILENO, 0, LOG_DOMAIN);
-    fdsan_close_with_tag(STDIN_FILENO, LOG_DOMAIN);
-    fdsan_exchange_owner_tag(STDERR_FILENO, 0, LOG_DOMAIN);
-    fdsan_close_with_tag(STDERR_FILENO, LOG_DOMAIN);
+    fdsan_close_with_tag(STDIN_FILENO, HIPERF_FD_TAG);
+    fdsan_close_with_tag(STDERR_FILENO, HIPERF_FD_TAG);
     isFifoServer_ = true;
 
     clientPipeOutput_ = open(fifoFileS2C_.c_str(), O_WRONLY);
@@ -786,12 +789,14 @@ bool SubCommandStat::HandleChildProcess()
         char errInfo[ERRINFOLEN] = {0};
         strerror_r(errno, errInfo, ERRINFOLEN);
         HLOGE("open fifo file(%s) failed. %d:%s", fifoFileS2C_.c_str(), errno, errInfo);
-        HIPERF_HILOGE(MODULE_DEFAULT, "open fifo file(%{public}s) failed. %{public}d:%{public}s",
+        HIPERF_HILOGE(MODULE_DEFAULT, "open fifo file(%{public}s) failed. %{public}d:%{public}s)",
             fifoFileS2C_.c_str(), errno, errInfo);
         return false;
     }
+    fdsan_exchange_owner_tag(clientPipeOutput_, 0, HIPERF_FD_TAG);
 
     nullFd_ = open("/dev/null", O_WRONLY);
+    fdsan_exchange_owner_tag(nullFd_, 0, HIPERF_FD_TAG);
     (void)dup2(nullFd_, STDOUT_FILENO); // redirect stdout to /dev/null
 
     std::string err = OHOS::Developtools::HiPerf::HandleAppInfo(appPackage_, inputPidTidArgs_);
@@ -811,18 +816,17 @@ bool SubCommandStat::HandleParentProcess(const pid_t& pid)
         HandleCommunicationError(fd, pid, "");
         return false;
     }
+    fdsan_exchange_owner_tag(fd, 0, HIPERF_FD_TAG);
     std::string reply = "";
     perfPipe_.WaitFifoReply(fd, CONTROL_WAITREPY_TIMEOUT, reply);
 
     if (reply != HiperfClient::REPLY_OK) {
         HandleCommunicationError(fd, pid, reply);
-        fdsan_exchange_owner_tag(fd, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(fd, LOG_DOMAIN);
+        fdsan_close_with_tag(fd, HIPERF_FD_TAG);
         return false;
     }
 
-    fdsan_exchange_owner_tag(fd, 0, LOG_DOMAIN);
-    fdsan_close_with_tag(fd, LOG_DOMAIN);
+    fdsan_close_with_tag(fd, HIPERF_FD_TAG);
     printf("%s control hiperf counting success.\n", restart_ ? "start" : "create");
     printf("stat result will saved in %s.\n", outputFilename_.c_str());
     return true;
@@ -918,10 +922,10 @@ void SubCommandStat::ClientCommandHandle()
         if (isFifoServer_ && hasRead) {
             if (clientPipeInput_ != -1) {
                 // after read(), block is disabled, the poll will be waked neven if no data
-                fdsan_exchange_owner_tag(clientPipeInput_, 0, LOG_DOMAIN);
-                fdsan_close_with_tag(clientPipeInput_, LOG_DOMAIN);
+                fdsan_close_with_tag(clientPipeInput_, HIPERF_FD_TAG);
             }
             clientPipeInput_ = open(fifoFileC2S_.c_str(), O_RDONLY | O_NONBLOCK);
+            fdsan_exchange_owner_tag(clientPipeInput_, 0, HIPERF_FD_TAG);
         }
         struct pollfd pollFd {
             clientPipeInput_, POLLIN, 0
@@ -1075,14 +1079,11 @@ void SubCommandStat::CloseClientThread()
         clientRunning_.store(false);
         HLOGI("CloseClientThread");
         if (nullFd_ != -1) {
-            fdsan_exchange_owner_tag(nullFd_, 0, LOG_DOMAIN);
-            fdsan_close_with_tag(nullFd_, LOG_DOMAIN);
+            fdsan_close_with_tag(nullFd_, HIPERF_FD_TAG);
         }
         clientCommandHandle_.join();
-        fdsan_exchange_owner_tag(clientPipeInput_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientPipeInput_, LOG_DOMAIN);
-        fdsan_exchange_owner_tag(clientPipeOutput_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientPipeOutput_, LOG_DOMAIN);
+        fdsan_close_with_tag(clientPipeInput_, HIPERF_FD_TAG);
+        fdsan_close_with_tag(clientPipeOutput_, HIPERF_FD_TAG);
         if (isFifoServer_) {
             remove(fifoFileC2S_.c_str());
             remove(fifoFileS2C_.c_str());
