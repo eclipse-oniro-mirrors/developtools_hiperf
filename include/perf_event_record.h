@@ -336,8 +336,8 @@ public:
     pid_t GetServerPidof(unsigned int ipNr);
 private:
     static bool dumpRemoveStack_;
-    void ParseSampleReadData(uint8_t *&p, u64 &dataSize);
-    void ParseSampleTailData(uint8_t *&p, const perf_event_attr &attr, u64 &dataSize, uint8_t *start);
+    bool ParseSampleReadData(uint8_t *&p, u64 &dataSize);
+    bool ParseSampleTailData(uint8_t *&p, const perf_event_attr &attr, u64 &dataSize, uint8_t *start);
     void SerializeSampleReadData(uint8_t *&p) const;
     void SerializeSampleTailData(uint8_t *&p) const;
     void DumpSampleReadData(const int indent) const;

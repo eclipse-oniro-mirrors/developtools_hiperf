@@ -251,47 +251,47 @@ int SpeGetPacket(const unsigned char *buf, const size_t len,
     return ret;
 }
 
-static int SpePktOutString(int *err, char **bufPtr, size_t *bufLen,
+static int SpePktOutString(int &err, char *&bufPtr, size_t &bufLen,
                            const char *fmt, ...)
 {
-    CHECK_TRUE(*bufPtr != nullptr && bufLen != nullptr && fmt != nullptr, -1, 1, "Invalid pointer!");
+    CHECK_TRUE(bufPtr != nullptr && fmt != nullptr, -1, 1, "Invalid pointer!");
     va_list args;
     int ret = 0;
 
     /* If any errors occur, exit */
-    if (err && *err) {
-        return *err;
+    if (err) {
+        return err;
     }
-    if (*bufLen - 1 < 0) {
-        HLOGW("SpePktOutString failed, bufLen: %d", static_cast<int>(*bufLen));
+    if (bufLen - 1 < 0) {
+        HLOGW("SpePktOutString failed, bufLen: %d", static_cast<int>(bufLen));
     }
     va_start(args, fmt);
-    ret = vsnprintf_s(*bufPtr, *bufLen, *bufLen - 1, fmt, args);
+    ret = vsnprintf_s(bufPtr, bufLen, bufLen - 1, fmt, args);
     va_end(args);
 
     if (ret < 0) {
-        if (err && !*err) {
-            *err = ret;
+        if (!err) {
+            err = ret;
         }
         HLOGW("vsnprintf_s failed: %d\n", ret);
 
     /*
-     * If the return value is *bufLen or greater, the output was
+     * If the return value is bufLen or greater, the output was
      * truncated and the buffer overflowed.
      */
-    } else if ((size_t)ret >= *bufLen) {
-        (*bufPtr)[*bufLen - 1] = '\0';
+    } else if ((size_t)ret >= bufLen) {
+        bufPtr[bufLen - 1] = '\0';
 
         /*
-         * Set *err to 'ret' to avoid overflow if tries to
+         * Set err to 'ret' to avoid overflow if tries to
          * fill this buffer sequentially.
          */
-        if (err && !*err) {
-            *err = ret;
+        if (!err) {
+            err = ret;
         }
     } else {
-        *bufPtr += ret;
-        *bufLen -= ret;
+        bufPtr += static_cast<size_t>(ret);
+        bufLen -= static_cast<size_t>(ret);
     }
 
     return ret;
@@ -304,7 +304,7 @@ static int SpePktDescEvent(const struct SpePkt *packet,
     u64 payload = packet->payload;
     int err = 0;
     if (bufLen > 0) {
-        SpePktOutString(&err, &buf, &bufLen, "EV");
+        SpePktOutString(err, buf, bufLen, "EV");
     }
     std::vector<std::pair<enum SpeEvents, const char*>> events = {
         {EVENT_EXCEPTION_GEN, " EXCEPTION-GEN"}, {EVENT_RETIRED, " RETIRED"},
@@ -317,7 +317,7 @@ static int SpePktDescEvent(const struct SpePkt *packet,
     };
     for (auto it = events.begin(); it != events.end(); ++it) {
         if ((payload & BIT(it->first)) && bufLen > 0) {
-            SpePktOutString(&err, &buf, &bufLen, it->second);
+            SpePktOutString(err, buf, bufLen, it->second);
         }
     }
     return err;
@@ -326,50 +326,50 @@ static int SpePktDescEvent(const struct SpePkt *packet,
 static int SpePktDescStatAtomicOpType(char *buf, size_t bufLen, u64 payload)
 {
     int err = 0;
-    SpePktOutString(&err, &buf, &bufLen,
+    SpePktOutString(err, buf, bufLen,
                     payload & 0x1 ? "ST" : "LD");
     if (PERF_SPE_OP_PKT_IS_LDST_ATOMIC(payload)) {
         if (payload & PERF_SPE_OP_PKT_AT)
-            SpePktOutString(&err, &buf, &bufLen, " AT");
+            SpePktOutString(err, buf, bufLen, " AT");
         if (payload & PERF_SPE_OP_PKT_EXCL)
-            SpePktOutString(&err, &buf, &bufLen, " EXCL");
+            SpePktOutString(err, buf, bufLen, " EXCL");
         if (payload & PERF_SPE_OP_PKT_AR)
-            SpePktOutString(&err, &buf, &bufLen, " AR");
+            SpePktOutString(err, buf, bufLen, " AR");
     }
     switch (PERF_SPE_OP_PKT_LDST_SUBCLASS_GET(payload)) {
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_SIMD_FP:
-            SpePktOutString(&err, &buf, &bufLen, " SIMD-FP");
+            SpePktOutString(err, buf, bufLen, " SIMD-FP");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_GP_REG:
-            SpePktOutString(&err, &buf, &bufLen, " GP-REG");
+            SpePktOutString(err, buf, bufLen, " GP-REG");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_UNSPEC_REG:
-            SpePktOutString(&err, &buf, &bufLen, " UNSPEC-REG");
+            SpePktOutString(err, buf, bufLen, " UNSPEC-REG");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_NV_SYSREG:
-            SpePktOutString(&err, &buf, &bufLen, " NV-SYSREG");
+            SpePktOutString(err, buf, bufLen, " NV-SYSREG");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_MTE_TAG:
-            SpePktOutString(&err, &buf, &bufLen, " MTE-TAG");
+            SpePktOutString(err, buf, bufLen, " MTE-TAG");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_MEMCPY:
-            SpePktOutString(&err, &buf, &bufLen, " MEMCPY");
+            SpePktOutString(err, buf, bufLen, " MEMCPY");
             break;
         case PERF_SPE_OP_PKT_LDST_SUBCLASS_MEMSET:
-            SpePktOutString(&err, &buf, &bufLen, " MEMSET");
+            SpePktOutString(err, buf, bufLen, " MEMSET");
             break;
         default:
             break;
     }
     if (PERF_SPE_OP_PKT_IS_LDST_SVE(payload)) {
         /* SVE effective vector length */
-        SpePktOutString(&err, &buf, &bufLen, " EVLEN %d",
+        SpePktOutString(err, buf, bufLen, " EVLEN %d",
                         PERF_SPE_OP_PKG_SVE_EVL(payload));
 
         if (payload & PERF_SPE_OP_PKT_SVE_PRED)
-            SpePktOutString(&err, &buf, &bufLen, " PRED");
+            SpePktOutString(err, buf, bufLen, " PRED");
         if (payload & PERF_SPE_OP_PKT_SVE_SG)
-            SpePktOutString(&err, &buf, &bufLen, " SG");
+            SpePktOutString(err, buf, bufLen, " SG");
     }
     return err;
 }
@@ -384,19 +384,19 @@ static int SpePktDescOpType(const struct SpePkt *packet,
     switch (packet->index) {
         case PERF_SPE_OP_PKT_HDR_CLASS_OTHER:
             if (PERF_SPE_OP_PKT_IS_OTHER_SVE_OP(payload)) {
-                SpePktOutString(&err, &buf, &bufLen, "SVE-OTHER");
+                SpePktOutString(err, buf, bufLen, "SVE-OTHER");
 
                 /* SVE effective vector length */
-                SpePktOutString(&err, &buf, &bufLen, " EVLEN %d",
+                SpePktOutString(err, buf, bufLen, " EVLEN %d",
                                 PERF_SPE_OP_PKG_SVE_EVL(payload));
 
                 if (payload & PERF_SPE_OP_PKT_SVE_FP)
-                    SpePktOutString(&err, &buf, &bufLen, " FP");
+                    SpePktOutString(err, buf, bufLen, " FP");
                 if (payload & PERF_SPE_OP_PKT_SVE_PRED)
-                    SpePktOutString(&err, &buf, &bufLen, " PRED");
+                    SpePktOutString(err, buf, bufLen, " PRED");
             } else {
-                SpePktOutString(&err, &buf, &bufLen, "OTHER");
-                SpePktOutString(&err, &buf, &bufLen, " %s",
+                SpePktOutString(err, buf, bufLen, "OTHER");
+                SpePktOutString(err, buf, bufLen, " %s",
                                 payload & PERF_SPE_OP_PKT_COND ?
                                 "COND-SELECT" : "INSN-OTHER");
             }
@@ -405,13 +405,13 @@ static int SpePktDescOpType(const struct SpePkt *packet,
             err = SpePktDescStatAtomicOpType(buf, bufLen, payload);
             break;
         case PERF_SPE_OP_PKT_HDR_CLASS_BR_ERET:
-            SpePktOutString(&err, &buf, &bufLen, "B");
+            SpePktOutString(err, buf, bufLen, "B");
 
             if (payload & PERF_SPE_OP_PKT_COND)
-                SpePktOutString(&err, &buf, &bufLen, " COND");
+                SpePktOutString(err, buf, bufLen, " COND");
 
             if (PERF_SPE_OP_PKT_IS_INDIRECT_BRANCH(payload))
-                SpePktOutString(&err, &buf, &bufLen, " IND");
+                SpePktOutString(err, buf, bufLen, " IND");
 
             break;
         default:
@@ -442,12 +442,12 @@ static int SpePktDescAddr(const struct SpePkt *packet,
             ns = !!PERF_SPE_ADDR_PKT_GET_NS(payload);
             el = PERF_SPE_ADDR_PKT_GET_EL(payload);
             payload = PERF_SPE_ADDR_PKT_ADDR_GET_BYTES_0_6(payload);
-            SpePktOutString(&err, &buf, &bufLen,
+            SpePktOutString(err, buf, bufLen,
                             "%s 0x%llx el%d ns=%d",
                             idxName[idx], payload, el, ns);
             break;
         case PERF_SPE_ADDR_PKT_HDR_INDEX_DATA_VIRT:
-            SpePktOutString(&err, &buf, &bufLen,
+            SpePktOutString(err, buf, bufLen,
                             "VA 0x%llx", payload);
             break;
         case PERF_SPE_ADDR_PKT_HDR_INDEX_DATA_PHYS:
@@ -455,7 +455,7 @@ static int SpePktDescAddr(const struct SpePkt *packet,
             ch = !!PERF_SPE_ADDR_PKT_GET_CH(payload);
             pat = PERF_SPE_ADDR_PKT_GET_PAT(payload);
             payload = PERF_SPE_ADDR_PKT_ADDR_GET_BYTES_0_6(payload);
-            SpePktOutString(&err, &buf, &bufLen,
+            SpePktOutString(err, buf, bufLen,
                             "PA 0x%llx ns=%d ch=%d pat=%x",
                             payload, ns, ch, pat);
             break;
@@ -476,18 +476,18 @@ static int SpePktDesCont(const struct SpePkt *packet,
     const std::string name = SpePktName(packet->type);
     int err = 0;
 
-    SpePktOutString(&err, &buf, &bufLen, "%s %d ", name.c_str(),
+    SpePktOutString(err, buf, bufLen, "%s %d ", name.c_str(),
                     (unsigned short)payload);
 
     switch (packet->index) {
         case PERF_SPE_CNT_PKT_HDR_INDEX_TOTAL_LAT:
-            SpePktOutString(&err, &buf, &bufLen, "TOT");
+            SpePktOutString(err, buf, bufLen, "TOT");
             break;
         case PERF_SPE_CNT_PKT_HDR_INDEX_ISSUE_LAT:
-            SpePktOutString(&err, &buf, &bufLen, "ISSUE");
+            SpePktOutString(err, buf, bufLen, "ISSUE");
             break;
         case PERF_SPE_CNT_PKT_HDR_INDEX_TRANS_LAT:
-            SpePktOutString(&err, &buf, &bufLen, "XLAT");
+            SpePktOutString(err, buf, bufLen, "XLAT");
             break;
         default:
             break;
@@ -511,7 +511,7 @@ int SpePktDesc(const struct SpePkt *packet, char *buf,
         case PERF_SPE_BAD:
         case PERF_SPE_PAD:
         case PERF_SPE_END:
-            SpePktOutString(&err, &buf, &blen, "%s", name.c_str());
+            SpePktOutString(err, buf, blen, "%s", name.c_str());
             break;
         case PERF_SPE_EVENTS:
             err = SpePktDescEvent(packet, buf, bufLen);
@@ -521,13 +521,13 @@ int SpePktDesc(const struct SpePkt *packet, char *buf,
             break;
         case PERF_SPE_DATA_SOURCE:
         case PERF_SPE_TIMESTAMP:
-            SpePktOutString(&err, &buf, &blen, "%s %llu", name.c_str(), payload);
+            SpePktOutString(err, buf, blen, "%s %llu", name.c_str(), payload);
             break;
         case PERF_SPE_ADDRESS:
             err = SpePktDescAddr(packet, buf, bufLen);
             break;
         case PERF_SPE_CONTEXT:
-            SpePktOutString(&err, &buf, &blen, "%s 0x%llx el%d",
+            SpePktOutString(err, buf, blen, "%s 0x%llx el%d",
                 name.c_str(), payload, idx + 1);
             break;
         case PERF_SPE_COUNTER:
@@ -542,7 +542,7 @@ int SpePktDesc(const struct SpePkt *packet, char *buf,
     /* If any errors are detected, the raw data is output*/
     if (err) {
         err = 0;
-        SpePktOutString(&err, &bufOrig, &bufLen, "%s 0x%llx (%d)",
+        SpePktOutString(err, bufOrig, bufLen, "%s 0x%llx (%d)",
                         name.c_str(), payload, packet->index);
     }
 

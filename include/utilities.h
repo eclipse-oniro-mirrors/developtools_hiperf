@@ -267,8 +267,6 @@ std::string PlatformPathConvert(const std::string &path);
 
 #define ALIGN(size, align) (((size) + (align) - 1) & (~((align) - 1)))
 
-uint32_t RoundUp(uint32_t x, const int align);
-
 // data convert function
 template<class T>
 std::string ToHex(const T &source, const int size = sizeof(T), const bool prefix = false)

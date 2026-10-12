@@ -117,11 +117,6 @@ std::string CanonicalizeSpecPath(const char* src)
     return std::string(resolvedPath);
 }
 
-uint32_t RoundUp(const uint32_t x, const int align)
-{
-    return (((x) + (align) >= 1 ? (x) + (align) - 1 : 0) / (align)) * (align);
-}
-
 std::string StringReplace(std::string source, const std::string &from, const std::string &to)
 {
     size_t pos = 0;
@@ -704,7 +699,7 @@ bool HexDump(const void *buf, const size_t size, const size_t maxSize)
         outputBytes = std::min(size, maxSize);
     }
 
-    for (size_t i = 0; i <= outputBytes; i += dumpByteEachLine) {
+    for (size_t i = 0; i < outputBytes; i += dumpByteEachLine) {
         HLOGM(" %02zu: %s ", i, BufferToHexString(byteBuf, dumpByteEachLine).c_str());
         byteBuf += dumpByteEachLine;
     }

@@ -68,6 +68,7 @@ private:
     bool Write(const void *buffer, const int size) override;
     virtual bool ProcessRecord(const PerfRecordComm &recordComm);
     virtual bool ProcessRecord(const PerfRecordLost &recordLost);
+    virtual bool ProcessRecord(const PerfRecordLostSamples &recordLostSamples);
     void BeforeClose();
 };
 

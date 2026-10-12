@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <iostream>
+#include <cstdint>
 
 #include <string>
 #include <utility>
@@ -89,6 +90,7 @@ bool CallStack::UnwindCallStack(const VirtualThread &thread, const bool abi32, u
         HLOGE("RegisterGetSPValue failed");
         return false;
     } else {
+        CHECK_TRUE(stackSize_ <= UINT64_MAX - stackPoint_, false, 1, "stackPoint + stackSize overflow");
         stackEnd_ = stackPoint_ + stackSize_;
     }
 

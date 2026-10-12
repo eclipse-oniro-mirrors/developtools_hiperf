@@ -312,6 +312,9 @@ protected:
         if (elfFile_->GetSectionInfo(shinfo, ".eh_frame_hdr")) {
             auto mmapPtr = elfFile_->GetMmapPtr();
             CHECK_TRUE(mmapPtr != nullptr, false, 1, "mmapPtr should not be nullptr.");
+            CHECK_TRUE(shinfo.offset <= elfFile_->GetMmapSize() &&
+                       shinfo.size <= elfFile_->GetMmapSize() - shinfo.offset,
+                       false, 1, "eh_frame_hdr section out of mmap bounds");
             LoadEhFrameHDR(mmapPtr + shinfo.offset, shinfo.size, shinfo.offset);
         }
 #endif
