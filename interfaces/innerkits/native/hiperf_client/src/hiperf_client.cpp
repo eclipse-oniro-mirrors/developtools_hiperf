@@ -460,10 +460,8 @@ void Client::GetExecCmd(std::vector<std::string> &cmd,
 void Client::ChildProcessHandle(const std::vector<std::string> &args, int (&clientToServerFd)[2],
                                 int (&serverToClientFd)[2])
 {
-    fdsan_exchange_owner_tag(clientToServerFd[PIPE_WRITE], 0, LOG_DOMAIN);
-    fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], LOG_DOMAIN);
-    fdsan_exchange_owner_tag(serverToClientFd[PIPE_READ], 0, LOG_DOMAIN);
-    fdsan_close_with_tag(serverToClientFd[PIPE_READ], LOG_DOMAIN);
+    fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], HIPERF_FD_TAG);
+    fdsan_close_with_tag(serverToClientFd[PIPE_READ], HIPERF_FD_TAG);
 
     std::vector<std::string> cmd;
     GetExecCmd(cmd, clientToServerFd[PIPE_READ], serverToClientFd[PIPE_WRITE], args);
@@ -472,10 +470,8 @@ void Client::ChildProcessHandle(const std::vector<std::string> &args, int (&clie
 
 void Client::ParentHandleProcess(int (&clientToServerFd)[2], int (&serverToClientFd)[2])
 {
-    fdsan_exchange_owner_tag(clientToServerFd[PIPE_READ], 0, LOG_DOMAIN);
-    fdsan_close_with_tag(clientToServerFd[PIPE_READ], LOG_DOMAIN);
-    fdsan_exchange_owner_tag(serverToClientFd[PIPE_WRITE], 0, LOG_DOMAIN);
-    fdsan_close_with_tag(serverToClientFd[PIPE_WRITE], LOG_DOMAIN);
+    fdsan_close_with_tag(clientToServerFd[PIPE_READ], HIPERF_FD_TAG);
+    fdsan_close_with_tag(serverToClientFd[PIPE_WRITE], HIPERF_FD_TAG);
 
     clientToServerFd_ = clientToServerFd[PIPE_WRITE];
     serverToClientFd_ = serverToClientFd[PIPE_READ];
@@ -496,30 +492,29 @@ bool Client::Start(const std::vector<std::string> &args, bool immediately)
         strerror_r(errno, errInfo, ERRINFOLEN);
         HIPERF_HILOGI(MODULE_CPP_API, "failed to create pipe: %" HILOG_PUBLIC "s", errInfo);
         return false;
-    } else if (pipe(serverToClientFd) != 0) {
+    }
+    fdsan_exchange_owner_tag(clientToServerFd[PIPE_READ], 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(clientToServerFd[PIPE_WRITE], 0, HIPERF_FD_TAG);
+    if (pipe(serverToClientFd) != 0) {
         char errInfo[ERRINFOLEN] = { 0 };
         strerror_r(errno, errInfo, ERRINFOLEN);
         HIPERF_HILOGI(MODULE_CPP_API, "failed to create pipe: %" HILOG_PUBLIC "s", errInfo);
-        fdsan_exchange_owner_tag(clientToServerFd[PIPE_READ], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientToServerFd[PIPE_READ], LOG_DOMAIN);
-        fdsan_exchange_owner_tag(clientToServerFd[PIPE_WRITE], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], LOG_DOMAIN);
+        fdsan_close_with_tag(clientToServerFd[PIPE_READ], HIPERF_FD_TAG);
+        fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], HIPERF_FD_TAG);
         return false;
     }
+    fdsan_exchange_owner_tag(serverToClientFd[PIPE_READ], 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(serverToClientFd[PIPE_WRITE], 0, HIPERF_FD_TAG);
 
     hperfPrePid_ = fork();
     if (hperfPrePid_ == -1) {
         char errInfo[ERRINFOLEN] = { 0 };
         strerror_r(errno, errInfo, ERRINFOLEN);
         HIPERF_HILOGI(MODULE_CPP_API, "failed to fork: %" HILOG_PUBLIC "s", errInfo);
-        fdsan_exchange_owner_tag(clientToServerFd[PIPE_READ], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientToServerFd[PIPE_READ], LOG_DOMAIN);
-        fdsan_exchange_owner_tag(clientToServerFd[PIPE_WRITE], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], LOG_DOMAIN);
-        fdsan_exchange_owner_tag(serverToClientFd[PIPE_READ], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(serverToClientFd[PIPE_READ], LOG_DOMAIN);
-        fdsan_exchange_owner_tag(serverToClientFd[PIPE_WRITE], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(serverToClientFd[PIPE_WRITE], LOG_DOMAIN);
+        fdsan_close_with_tag(clientToServerFd[PIPE_READ], HIPERF_FD_TAG);
+        fdsan_close_with_tag(clientToServerFd[PIPE_WRITE], HIPERF_FD_TAG);
+        fdsan_close_with_tag(serverToClientFd[PIPE_READ], HIPERF_FD_TAG);
+        fdsan_close_with_tag(serverToClientFd[PIPE_WRITE], HIPERF_FD_TAG);
         return false;
     } else if (hperfPrePid_ == 0) {
         ChildProcessHandle(args, clientToServerFd, serverToClientFd);
@@ -670,10 +665,8 @@ bool Client::RunHiperfCmdSync(const RecordOption &option)
 
 void Client::HandleSyncForkFailure(int readFd, int writeFd)
 {
-    fdsan_exchange_owner_tag(readFd, 0, LOG_DOMAIN);
-    fdsan_close_with_tag(readFd, LOG_DOMAIN);
-    fdsan_exchange_owner_tag(writeFd, 0, LOG_DOMAIN);
-    fdsan_close_with_tag(writeFd, LOG_DOMAIN);
+    fdsan_close_with_tag(readFd, HIPERF_FD_TAG);
+    fdsan_close_with_tag(writeFd, HIPERF_FD_TAG);
     execSyncPipeReadFd_.store(-1);
     execSyncPipeWriteFd_.store(-1);
     char errInfo[ERRINFOLEN] = { 0 };
@@ -698,14 +691,15 @@ bool Client::RunCmdSyncStoppable(const RecordOption &option)
     }
     execSyncPipeReadFd_.store(pipeFd[0]);  // parent keeps read-end
     execSyncPipeWriteFd_.store(pipeFd[1]); // child holds write-end (closed by kernel on execv)
+    fdsan_exchange_owner_tag(pipeFd[0], 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(pipeFd[1], 0, HIPERF_FD_TAG);
 
     pid_t pid = fork();
     if (pid == -1) {
         HandleSyncForkFailure(pipeFd[0], pipeFd[1]);
         return false;
     } else if (pid == 0) {
-        fdsan_exchange_owner_tag(pipeFd[0], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(pipeFd[0], LOG_DOMAIN);
+        fdsan_close_with_tag(pipeFd[0], HIPERF_FD_TAG);
         // write-end (pipeFd[1]) has O_CLOEXEC; kernel closes it on execv.
         const std::vector<std::string> &args = option.GetOptionVecString();
         std::vector<std::string> cmd;
@@ -714,8 +708,7 @@ bool Client::RunCmdSyncStoppable(const RecordOption &option)
     } else {
         hiperfPid_.store(pid);
         // Close the child write-end copy in parent; we only need the read-end.
-        fdsan_exchange_owner_tag(pipeFd[1], 0, LOG_DOMAIN);
-        fdsan_close_with_tag(pipeFd[1], LOG_DOMAIN);
+        fdsan_close_with_tag(pipeFd[1], HIPERF_FD_TAG);
         execSyncPipeWriteFd_.store(-1);
 
         pid_t wpid;
@@ -724,8 +717,7 @@ bool Client::RunCmdSyncStoppable(const RecordOption &option)
         hiperfPid_.store(-1);
         int rfd = execSyncPipeReadFd_.exchange(-1);
         if (rfd != -1) {
-            fdsan_exchange_owner_tag(rfd, 0, LOG_DOMAIN);
-            fdsan_close_with_tag(rfd, LOG_DOMAIN);
+            fdsan_close_with_tag(rfd, HIPERF_FD_TAG);
         }
         return ret;
     }
@@ -740,8 +732,7 @@ KillResult Client::StopHiperfCmdSync()
         struct pollfd pfd {rfd, POLLIN | POLLHUP, 0};
         constexpr int EXEC_WAIT_MS = 1000;
         poll(&pfd, 1, EXEC_WAIT_MS);
-        fdsan_exchange_owner_tag(rfd, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(rfd, LOG_DOMAIN);
+        fdsan_close_with_tag(rfd, HIPERF_FD_TAG);
     }
 
     constexpr int PID_WAIT_RETRIES = 100;
@@ -838,13 +829,11 @@ void Client::KillChild()
 {
     HIPERF_HILOGI(MODULE_CPP_API, "Client KillChild\n");
     if (clientToServerFd_ != -1) {
-        fdsan_exchange_owner_tag(clientToServerFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(clientToServerFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(clientToServerFd_, HIPERF_FD_TAG);
         clientToServerFd_ = -1;
     }
     if (serverToClientFd_ != -1) {
-        fdsan_exchange_owner_tag(serverToClientFd_, 0, LOG_DOMAIN);
-        fdsan_close_with_tag(serverToClientFd_, LOG_DOMAIN);
+        fdsan_close_with_tag(serverToClientFd_, HIPERF_FD_TAG);
         serverToClientFd_ = -1;
     }
     pid_t hperfPid = hiperfPid_.exchange(-1);
