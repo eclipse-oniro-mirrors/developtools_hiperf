@@ -385,6 +385,10 @@ bool SubCommandRecord::GetOptions(std::vector<std::string> &args)
     if (clientPipeInput_ != -1 && clientPipeOutput_ != -1) {
         isHiperfClient_ = true;
     }
+    if (isHiperfClient_) {
+        fdsan_exchange_owner_tag(clientPipeInput_, 0, HIPERF_FD_TAG);
+        fdsan_exchange_owner_tag(clientPipeOutput_, 0, HIPERF_FD_TAG);
+    }
     if (!Option::GetOptionValue(args, "--dedup_stack", dedupStack_)) {
         return false;
     }
