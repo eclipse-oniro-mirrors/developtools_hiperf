@@ -524,7 +524,7 @@ bool UncompressFile(const std::string &gzipFile, const std::string &dataFile)
         perror("Fail to fopen(rb)");
         return false;
     }
-    std::unique_ptr<gzFile_s, decltype(&gzclose)> fgz(gzopen(gzipFile.c_str(), "rb"), gzclose);
+    std::unique_ptr<gzFile_s, decltype(&gzclose)> fgz(gzopen(gzipFile.c_str(), "rbG"), gzclose);
     if (fgz == nullptr) {
         HLOGE("Fail to call gzopen(%s)", gzipFile.c_str());
         fclose(fp);
@@ -540,14 +540,12 @@ bool UncompressFile(const std::string &gzipFile, const std::string &dataFile)
             return false;
         }
     }
-    if (!gzeof(fgz.get())) {
-        int rc = 0;
-        const char *err = gzerror(fgz.get(), &rc);
-        if (rc != Z_OK) {
-            HLOGE("gzfread return %d:%s", rc, err);
-            fclose(fp);
-            return false;
-        }
+    int rc = 0;
+    const char *err = gzerror(fgz.get(), &rc);
+    if (rc != Z_OK) {
+        HLOGE("gzfread return %d:%s", rc, err);
+        fclose(fp);
+        return false;
     }
     if (fclose(fp) < 0) {
         return false;
