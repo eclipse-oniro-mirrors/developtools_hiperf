@@ -137,6 +137,7 @@ public:
     }
 
     virtual void SetBoolValue(bool value);
+    void SetCallStackFp(bool isFp) { isCallStackFp_ = isFp; }
     // load symbol from file
     virtual bool LoadSymbols([[maybe_unused]] std::shared_ptr<DfxMap> map = nullptr,
                              [[maybe_unused]] const std::string &symbolFilePath = EMPTY_STRING)
@@ -245,6 +246,7 @@ public:
     }
 
 protected:
+    bool isCallStackFp_ = false;
     bool symbolsLoaded_ = false;
     bool symbolsLoadResult_ = false;
     bool debugInfoLoaded_ = false;

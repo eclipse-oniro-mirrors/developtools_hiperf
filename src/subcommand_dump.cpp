@@ -183,6 +183,9 @@ HiperfError SubCommandDump::OnSubCommand(std::vector<std::string>& args)
         return HiperfError::OPEN_DATA_FILE_FAIL;
     }
 
+    const auto attrs = reader_->GetAttrSection();
+    vr_.SetCallStackFp(!attrs.empty() && IsFpSampleType(attrs.front().attr.sample_type));
+
     // any way tell symbols this is not on device
     SymbolsFile::onRecording_ = false;
     // we need unwind it (for function name match) even not give us path

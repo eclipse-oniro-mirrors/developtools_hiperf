@@ -537,6 +537,10 @@ bool SubCommandReport::LoadPerfData()
         return false;
     }
 
+    // Match the default attribute used by PerfFileReader to decode samples.
+    const auto attrs = recordFileReader_->GetAttrSection();
+    GetReport().virtualRuntime_.SetCallStackFp(!attrs.empty() && IsFpSampleType(attrs.front().attr.sample_type));
+
     CHECK_TRUE(recordFileReader_->ReadFeatureSection(), false, LOG_TYPE_PRINTF, "record format error.\n");
     if (jsonFormat_) {
         reportJsonFile_ =

@@ -419,6 +419,17 @@ static bool CompareRecordSample(const TestRecordSamplest &record, const std::vec
 }
 
 const std::string RECORDNAME_SAMPLE = "sample";
+
+HWTEST_F(PerfEventRecordTest, IsFpSampleType, TestSize.Level1)
+{
+    constexpr uint64_t base = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_PERIOD;
+    EXPECT_FALSE(IsFpSampleType(0));
+    EXPECT_FALSE(IsFpSampleType(base));
+    EXPECT_TRUE(IsFpSampleType(base | PERF_SAMPLE_CALLCHAIN));
+    EXPECT_FALSE(IsFpSampleType(base | PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_STACK_USER));
+    EXPECT_FALSE(IsFpSampleType(base | PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_REGS_USER));
+}
+
 HWTEST_F(PerfEventRecordTest, Sample, TestSize.Level1)
 {
     perf_event_attr attr {};
