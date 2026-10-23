@@ -1729,6 +1729,425 @@ HWTEST_F(UtilitiesTest, GetDefaultPathByEnv_Default, TestSize.Level2)
 }
 
 /**
+ * @tc.name: ShellAppDefaultPath_NonAppUid
+ * @tc.desc: Non-application uids keep the local tmp default file
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_NonAppUid) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    constexpr uint32_t rootUid = 0;
+    constexpr uint32_t shellUid = 2000;
+    constexpr uint32_t hiviewUid = 1201;
+    constexpr uint32_t taskManagerUid = 7005;
+    constexpr uint32_t appUidThreshold = 20000000;
+    const uint32_t uids[] = {rootUid, shellUid, hiviewUid, taskManagerUid, appUidThreshold};
+    const char *tmpDir = "/data/storage/el2/base/temp";
+    for (uint32_t uid : uids) {
+        EXPECT_EQ(BuildShellAppDefaultPath(uid, tmpDir, "perf.data"), "/data/local/tmp/perf.data");
+    }
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_Tmpdir
+ * @tc.desc: Application uid uses TMPDIR without a trailing slash
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_Tmpdir) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    constexpr uint32_t appUid = 20000001;
+    const char *tmpDir = "/data/storage/el2/base/temp";
+    EXPECT_EQ(BuildShellAppDefaultPath(appUid, tmpDir, "perf.data"),
+              "/data/storage/el2/base/temp/perf.data");
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_TmpdirSlash
+ * @tc.desc: Application uid joins a TMPDIR that already ends with a slash
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_TmpdirSlash) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    constexpr uint32_t appUid = 20000001;
+    const char *tmpDir = "/data/storage/el2/base/temp/";
+    EXPECT_EQ(BuildShellAppDefaultPath(appUid, tmpDir, "perf.data"),
+              "/data/storage/el2/base/temp/perf.data");
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_NoTmpdir
+ * @tc.desc: Application uid falls back when TMPDIR is missing
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_NoTmpdir) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    constexpr uint32_t appUid = 20000001;
+    EXPECT_EQ(BuildShellAppDefaultPath(appUid, nullptr, "perf.data"),
+              "/storage/Users/currentUser/perf.data");
+    EXPECT_EQ(BuildShellAppDefaultPath(appUid, "", "perf.data"),
+              "/storage/Users/currentUser/perf.data");
+}
+
+namespace {
+constexpr uint32_t ROOT_UID = 0;
+constexpr uint32_t SHELL_UID = 2000;
+constexpr uint32_t HIVIEW_UID = 1201;
+constexpr uint32_t TASK_MANAGER_UID = 7005;
+constexpr uint32_t BELOW_THRESHOLD_UID = 19999999;
+constexpr uint32_t UID_THRESHOLD = 20000000;
+constexpr uint32_t FIRST_APP_UID = 20000001;
+constexpr uint32_t NEXT_APP_UID = 20000002;
+constexpr uint32_t SECOND_APP_UID = 20010044;
+constexpr uint32_t MAX_UID = 4294967295u;
+constexpr const char *LOCAL_ROOT = "/data/local/tmp/";
+constexpr const char *SANDBOX_ROOT = "/storage/Users/currentUser/";
+constexpr const char *MEDIA_PREFIX = "/storage/media/";
+constexpr const char *PERF_DATA = "perf.data";
+constexpr const char *PERF_STAT = "perf_stat.txt";
+constexpr const char *HIPERF_LOG = "hiperf_log.txt";
+
+struct AppDirLayout {
+    const char *dir;
+    const char *perfDataPath;
+    const char *perfStatPath;
+    const char *hiperfLogPath;
+};
+
+// Sandbox views an application can pass through TMPDIR. Expected strings are literals.
+const AppDirLayout APP_DIR_LAYOUTS[] = {
+    {"/data/storage/el2/base/temp", "/data/storage/el2/base/temp/perf.data",
+     "/data/storage/el2/base/temp/perf_stat.txt", "/data/storage/el2/base/temp/hiperf_log.txt"},
+    {"/data/storage/el1/base/temp", "/data/storage/el1/base/temp/perf.data",
+     "/data/storage/el1/base/temp/perf_stat.txt", "/data/storage/el1/base/temp/hiperf_log.txt"},
+    {"/data/storage/el2/base/haps/entry/temp", "/data/storage/el2/base/haps/entry/temp/perf.data",
+     "/data/storage/el2/base/haps/entry/temp/perf_stat.txt",
+     "/data/storage/el2/base/haps/entry/temp/hiperf_log.txt"},
+    {"/data/storage/el2/base/haps/feature/temp",
+     "/data/storage/el2/base/haps/feature/temp/perf.data",
+     "/data/storage/el2/base/haps/feature/temp/perf_stat.txt",
+     "/data/storage/el2/base/haps/feature/temp/hiperf_log.txt"},
+    {"/data/storage/el1/base/haps/entry/temp", "/data/storage/el1/base/haps/entry/temp/perf.data",
+     "/data/storage/el1/base/haps/entry/temp/perf_stat.txt",
+     "/data/storage/el1/base/haps/entry/temp/hiperf_log.txt"},
+    {"/data/storage/el2/base/cache", "/data/storage/el2/base/cache/perf.data",
+     "/data/storage/el2/base/cache/perf_stat.txt", "/data/storage/el2/base/cache/hiperf_log.txt"},
+    {"/data/storage/el2/base/files", "/data/storage/el2/base/files/perf.data",
+     "/data/storage/el2/base/files/perf_stat.txt", "/data/storage/el2/base/files/hiperf_log.txt"},
+    {"/data/storage/el2/base/preferences", "/data/storage/el2/base/preferences/perf.data",
+     "/data/storage/el2/base/preferences/perf_stat.txt",
+     "/data/storage/el2/base/preferences/hiperf_log.txt"},
+    {"/data/storage/el2/base/database", "/data/storage/el2/base/database/perf.data",
+     "/data/storage/el2/base/database/perf_stat.txt",
+     "/data/storage/el2/base/database/hiperf_log.txt"},
+    {"/data/storage/el1/base/cache", "/data/storage/el1/base/cache/perf.data",
+     "/data/storage/el1/base/cache/perf_stat.txt", "/data/storage/el1/base/cache/hiperf_log.txt"},
+};
+
+struct JoinEdge {
+    uint32_t uid;
+    const char *tmpDir;
+    const char *fileType;
+    const char *expected;
+};
+
+const JoinEdge JOIN_EDGES[] = {
+    {FIRST_APP_UID, "/", PERF_DATA, "/perf.data"},
+    {FIRST_APP_UID, "/", PERF_STAT, "/perf_stat.txt"},
+    {FIRST_APP_UID, "/", HIPERF_LOG, "/hiperf_log.txt"},
+    {FIRST_APP_UID, "temp", PERF_DATA, "temp/perf.data"},
+    {FIRST_APP_UID, "temp/", PERF_DATA, "temp/perf.data"},
+    {FIRST_APP_UID, "temp//", PERF_DATA, "temp//perf.data"},
+    {SECOND_APP_UID, "haps/entry/temp", PERF_STAT, "haps/entry/temp/perf_stat.txt"},
+    {MAX_UID, "/data/storage/el2/base/temp/", PERF_DATA, "/data/storage/el2/base/temp/perf.data"},
+};
+
+const uint32_t NON_APP_UIDS[] = {
+    ROOT_UID, SHELL_UID, HIVIEW_UID, TASK_MANAGER_UID, BELOW_THRESHOLD_UID, UID_THRESHOLD,
+};
+
+const char *g_ignoredTmpDirs[] = {
+    "/data/storage/el2/base/temp",
+    "/data/storage/el2/base/temp/",
+    "/data/storage/el1/base/haps/entry/temp",
+    "/",
+    "temp",
+    "temp/",
+};
+
+const char *g_outputFiles[] = {PERF_DATA, PERF_STAT, HIPERF_LOG};
+
+const uint32_t APP_UIDS[] = {FIRST_APP_UID, NEXT_APP_UID, SECOND_APP_UID, MAX_UID};
+
+std::string LocalOutput(const char *fileType)
+{
+    return std::string(LOCAL_ROOT) + fileType;
+}
+
+std::string SandboxOutput(const char *fileType)
+{
+    return std::string(SANDBOX_ROOT) + fileType;
+}
+
+bool HasSuffix(const std::string &path, const char *suffix)
+{
+    const std::string tail(suffix);
+    if (path.size() < tail.size()) {
+        return false;
+    }
+    return path.compare(path.size() - tail.size(), tail.size(), tail) == 0;
+}
+} // namespace
+
+/**
+ * @tc.name: ShellAppDefaultPath_NonAppTmp
+ * @tc.desc: root, hdc shell, hiview, task manager and threshold uids keep the local default
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_NonAppTmp) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    for (uint32_t uid : NON_APP_UIDS) {
+        const std::string nullData = BuildShellAppDefaultPath(uid, nullptr, PERF_DATA);
+        const std::string emptyStat = BuildShellAppDefaultPath(uid, "", PERF_STAT);
+        EXPECT_EQ(nullData, LocalOutput(PERF_DATA));
+        EXPECT_EQ(emptyStat, LocalOutput(PERF_STAT));
+        EXPECT_EQ(nullData.find(SANDBOX_ROOT), std::string::npos);
+        EXPECT_EQ(emptyStat.find(MEDIA_PREFIX), std::string::npos);
+        for (const char *tmpDir : g_ignoredTmpDirs) {
+            const bool sandboxTmp = std::string(tmpDir).find("/data/storage/") == 0;
+            for (const char *fileType : g_outputFiles) {
+                const std::string actual = BuildShellAppDefaultPath(uid, tmpDir, fileType);
+                EXPECT_EQ(actual, LocalOutput(fileType));
+                EXPECT_TRUE(HasSuffix(actual, fileType));
+                EXPECT_EQ(actual.find(SANDBOX_ROOT), std::string::npos);
+                EXPECT_EQ(actual.find(MEDIA_PREFIX), std::string::npos);
+                EXPECT_TRUE(!sandboxTmp || actual.find(tmpDir) == std::string::npos);
+            }
+        }
+    }
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_AppDirLayouts
+ * @tc.desc: an application uid joins each sandbox directory once, with or without a trailing slash
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_AppDirLayouts) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    for (const AppDirLayout &layout : APP_DIR_LAYOUTS) {
+        const std::string slashed(std::string(layout.dir) + "/");
+        const char *dirs[] = {layout.dir, slashed.c_str()};
+        struct JoinedCase {
+            uint32_t uid;
+            const char *fileType;
+            const char *expected;
+        };
+        const JoinedCase cases[] = {
+            {FIRST_APP_UID, PERF_DATA, layout.perfDataPath},
+            {SECOND_APP_UID, PERF_STAT, layout.perfStatPath},
+            {MAX_UID, HIPERF_LOG, layout.hiperfLogPath},
+        };
+        for (const char *dir : dirs) {
+            for (const JoinedCase &item : cases) {
+                const std::string actual = BuildShellAppDefaultPath(item.uid, dir, item.fileType);
+                EXPECT_EQ(actual, item.expected);
+                EXPECT_TRUE(HasSuffix(actual, item.fileType));
+                EXPECT_EQ(actual.find(LOCAL_ROOT), std::string::npos);
+                EXPECT_EQ(actual.find(MEDIA_PREFIX), std::string::npos);
+                EXPECT_NE(actual, LocalOutput(item.fileType));
+            }
+        }
+        EXPECT_NE(layout.perfDataPath, layout.perfStatPath);
+        EXPECT_NE(layout.perfStatPath, layout.hiperfLogPath);
+    }
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_MissingTmpdir
+ * @tc.desc: a null and an empty TMPDIR both fall back to the sandbox user directory
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_MissingTmpdir) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    for (uint32_t uid : APP_UIDS) {
+        for (const char *fileType : g_outputFiles) {
+            const std::string fromNull = BuildShellAppDefaultPath(uid, nullptr, fileType);
+            const std::string fromEmpty = BuildShellAppDefaultPath(uid, "", fileType);
+            EXPECT_EQ(fromNull, SandboxOutput(fileType));
+            EXPECT_EQ(fromEmpty, fromNull);
+            EXPECT_NE(fromNull, LocalOutput(fileType));
+            EXPECT_TRUE(HasSuffix(fromNull, fileType));
+            EXPECT_EQ(fromNull.find(MEDIA_PREFIX), std::string::npos);
+        }
+    }
+    const std::string rootData = BuildShellAppDefaultPath(ROOT_UID, nullptr, PERF_DATA);
+    const std::string hiviewStat = BuildShellAppDefaultPath(HIVIEW_UID, "", PERF_STAT);
+    const std::string taskLog = BuildShellAppDefaultPath(TASK_MANAGER_UID, nullptr, HIPERF_LOG);
+    const std::string thresholdData = BuildShellAppDefaultPath(UID_THRESHOLD, "", PERF_DATA);
+    EXPECT_EQ(rootData, LocalOutput(PERF_DATA));
+    EXPECT_EQ(hiviewStat, LocalOutput(PERF_STAT));
+    EXPECT_EQ(taskLog, LocalOutput(HIPERF_LOG));
+    EXPECT_EQ(thresholdData, LocalOutput(PERF_DATA));
+    EXPECT_EQ(rootData.find(SANDBOX_ROOT), std::string::npos);
+    EXPECT_EQ(taskLog.find(MEDIA_PREFIX), std::string::npos);
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_UidBoundary
+ * @tc.desc: the threshold uid stays local and the next uid starts using TMPDIR
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_UidBoundary) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    const char *tmpDir = APP_DIR_LAYOUTS[0].dir;
+    const std::string below = BuildShellAppDefaultPath(BELOW_THRESHOLD_UID, tmpDir, PERF_DATA);
+    const std::string threshold = BuildShellAppDefaultPath(UID_THRESHOLD, tmpDir, PERF_DATA);
+    const std::string above = BuildShellAppDefaultPath(FIRST_APP_UID, tmpDir, PERF_DATA);
+    const std::string root = BuildShellAppDefaultPath(ROOT_UID, tmpDir, PERF_DATA);
+    EXPECT_EQ(below, root);
+    EXPECT_EQ(threshold, root);
+    EXPECT_EQ(root, LocalOutput(PERF_DATA));
+    EXPECT_EQ(above, APP_DIR_LAYOUTS[0].perfDataPath);
+    EXPECT_NE(above, threshold);
+    const std::string next = BuildShellAppDefaultPath(NEXT_APP_UID, tmpDir, PERF_STAT);
+    EXPECT_EQ(next, APP_DIR_LAYOUTS[0].perfStatPath);
+    const std::string widest =
+        BuildShellAppDefaultPath(MAX_UID, APP_DIR_LAYOUTS[0].dir, HIPERF_LOG);
+    EXPECT_EQ(widest, APP_DIR_LAYOUTS[0].hiperfLogPath);
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_JoinEdges
+ * @tc.desc: slash-only, relative and already slashed TMPDIR values join without a physical-path
+ * rewrite
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_JoinEdges) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    for (const JoinEdge &edge : JOIN_EDGES) {
+        const std::string actual = BuildShellAppDefaultPath(edge.uid, edge.tmpDir, edge.fileType);
+        EXPECT_EQ(actual, edge.expected);
+        EXPECT_TRUE(HasSuffix(actual, edge.fileType));
+        EXPECT_EQ(actual.find(LOCAL_ROOT), std::string::npos);
+        EXPECT_EQ(actual.find(MEDIA_PREFIX), std::string::npos);
+        EXPECT_NE(actual, LocalOutput(edge.fileType));
+    }
+    const std::string plain = BuildShellAppDefaultPath(FIRST_APP_UID, "temp", PERF_DATA);
+    const std::string slashed = BuildShellAppDefaultPath(FIRST_APP_UID, "temp/", PERF_DATA);
+    EXPECT_EQ(plain, slashed);
+    EXPECT_NE(BuildShellAppDefaultPath(FIRST_APP_UID, "temp//", PERF_DATA), plain);
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_FilesDiffer
+ * @tc.desc: perf.data, perf_stat.txt and hiperf_log.txt stay distinct for the same caller
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_FilesDiffer) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    const AppDirLayout &layout = APP_DIR_LAYOUTS[0];
+    const char *tmpDir = layout.dir;
+    const std::string appData = BuildShellAppDefaultPath(FIRST_APP_UID, tmpDir, PERF_DATA);
+    const std::string appStat = BuildShellAppDefaultPath(FIRST_APP_UID, tmpDir, PERF_STAT);
+    const std::string appLog = BuildShellAppDefaultPath(FIRST_APP_UID, tmpDir, HIPERF_LOG);
+    EXPECT_NE(appData, appStat);
+    EXPECT_NE(appStat, appLog);
+    EXPECT_NE(appData, appLog);
+    EXPECT_EQ(appData, layout.perfDataPath);
+    const std::string localData = BuildShellAppDefaultPath(TASK_MANAGER_UID, tmpDir, PERF_DATA);
+    const std::string localStat = BuildShellAppDefaultPath(TASK_MANAGER_UID, tmpDir, PERF_STAT);
+    const std::string localLog = BuildShellAppDefaultPath(HIVIEW_UID, tmpDir, HIPERF_LOG);
+    EXPECT_NE(localData, localStat);
+    EXPECT_NE(localStat, localLog);
+    EXPECT_EQ(localData, LocalOutput(PERF_DATA));
+    EXPECT_EQ(localStat, LocalOutput(PERF_STAT));
+    EXPECT_EQ(localLog, LocalOutput(HIPERF_LOG));
+    EXPECT_NE(appData, localData);
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_Privileged
+ * @tc.desc: hiview and task manager keep the local default while an application uid uses the same
+ * TMPDIR
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_Privileged) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    for (const AppDirLayout &layout : APP_DIR_LAYOUTS) {
+        const std::string hiview = BuildShellAppDefaultPath(HIVIEW_UID, layout.dir, PERF_DATA);
+        const std::string taskManager =
+            BuildShellAppDefaultPath(TASK_MANAGER_UID, layout.dir, PERF_DATA);
+        const std::string app = BuildShellAppDefaultPath(FIRST_APP_UID, layout.dir, PERF_DATA);
+        EXPECT_EQ(hiview, LocalOutput(PERF_DATA));
+        EXPECT_EQ(taskManager, hiview);
+        EXPECT_EQ(app, layout.perfDataPath);
+        EXPECT_NE(app, hiview);
+        EXPECT_EQ(hiview.find(MEDIA_PREFIX), std::string::npos);
+        EXPECT_EQ(app.find(MEDIA_PREFIX), std::string::npos);
+    }
+}
+
+/**
+ * @tc.name: ShellAppDefaultPath_TmpChange
+ * @tc.desc: swapping TMPDIR changes only the application path
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, ShellAppDefaultPath_TmpChange) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    const char *firstDir = APP_DIR_LAYOUTS[0].dir;
+    const char *secondDir = APP_DIR_LAYOUTS[1].dir;
+    EXPECT_NE(std::string(firstDir), secondDir);
+    const std::string appFirst = BuildShellAppDefaultPath(FIRST_APP_UID, firstDir, PERF_DATA);
+    const std::string appSecond = BuildShellAppDefaultPath(FIRST_APP_UID, secondDir, PERF_DATA);
+    EXPECT_EQ(appFirst, APP_DIR_LAYOUTS[0].perfDataPath);
+    EXPECT_EQ(appSecond, APP_DIR_LAYOUTS[1].perfDataPath);
+    EXPECT_NE(appFirst, appSecond);
+    const std::string rootFirst = BuildShellAppDefaultPath(ROOT_UID, firstDir, PERF_DATA);
+    const std::string rootSecond = BuildShellAppDefaultPath(ROOT_UID, secondDir, PERF_DATA);
+    EXPECT_EQ(rootFirst, rootSecond);
+    EXPECT_EQ(rootFirst, LocalOutput(PERF_DATA));
+    const std::string shellFirst = BuildShellAppDefaultPath(SHELL_UID, firstDir, HIPERF_LOG);
+    const std::string shellSecond = BuildShellAppDefaultPath(SHELL_UID, nullptr, HIPERF_LOG);
+    EXPECT_EQ(shellFirst, shellSecond);
+}
+
+/**
+ * @tc.name: GetDefaultPathByEnv_LocalOutputs
+ * @tc.desc: this build keeps the local default for record, stat and debug-log files
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, GetDefaultPathByEnv_LocalOutputs) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    const std::string dataPath = GetDefaultPathByEnv(PERF_DATA);
+    const std::string statPath = GetDefaultPathByEnv(PERF_STAT);
+    const std::string logPath = GetDefaultPathByEnv(HIPERF_LOG);
+    EXPECT_EQ(dataPath, LocalOutput(PERF_DATA));
+    EXPECT_EQ(statPath, LocalOutput(PERF_STAT));
+    EXPECT_EQ(logPath, LocalOutput(HIPERF_LOG));
+    EXPECT_EQ(dataPath, GetDefaultPathByEnv(PERF_DATA));
+    EXPECT_NE(dataPath, statPath);
+    EXPECT_NE(statPath, logPath);
+    EXPECT_EQ(dataPath, BuildShellAppDefaultPath(ROOT_UID, APP_DIR_LAYOUTS[0].dir, PERF_DATA));
+    EXPECT_NE(dataPath, BuildShellAppDefaultPath(FIRST_APP_UID, nullptr, PERF_DATA));
+    EXPECT_NE(statPath, SandboxOutput(PERF_STAT));
+    EXPECT_EQ(dataPath.find(MEDIA_PREFIX), std::string::npos);
+}
+
+/**
+ * @tc.name: IsShellAppUid_MacroOff
+ * @tc.desc: IsShellAppUid stays false for local and application uids in this build
+ * @tc.type: FUNC
+ */
+TEST_F(UtilitiesTest, IsShellAppUid_MacroOff) // NOLINT(cppcoreguidelines-owning-memory)
+{
+    const uint32_t uids[] = {
+        ROOT_UID,      SHELL_UID,     HIVIEW_UID,   TASK_MANAGER_UID, BELOW_THRESHOLD_UID,
+        UID_THRESHOLD, FIRST_APP_UID, NEXT_APP_UID, SECOND_APP_UID,   MAX_UID,
+    };
+    for (uint32_t uid : uids) {
+        EXPECT_FALSE(IsShellAppUid(uid));
+    }
+}
+
+/**
  * @tc.name: CheckAppIsRunning_EmptyAppPackage
  * @tc.desc: Test CheckAppIsRunning returns true when appPackage is empty
  * @tc.type: FUNC

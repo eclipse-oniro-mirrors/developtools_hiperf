@@ -30,11 +30,7 @@ const std::map<DebugLevel, const std::string> DebugLevelMap = {
 };
 DebugLogger::DebugLogger() : timeStamp_(std::chrono::steady_clock::now())
 {
-#if defined(is_sandbox_mapping) && is_sandbox_mapping
     logPath_ = GetDefaultPathByEnv("hiperf_log.txt");
-#else
-    logPath_ = "/data/local/tmp/hiperf_log.txt";
-#endif
     OpenLog();
 }
 

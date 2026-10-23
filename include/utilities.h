@@ -444,6 +444,10 @@ bool IsParallelHitsEnabled();
 bool IsShellOrRootUid();
 
 std::string GetDefaultPathByEnv(const std::string fileType);
+// True only when sandbox path mapping is compiled in and uid is an application uid.
+bool IsShellAppUid(uint32_t uid);
+// Default output file for a caller uid. tmpDir is the TMPDIR value and may be nullptr.
+std::string BuildShellAppDefaultPath(uint32_t uid, const char *tmpDir, const std::string &fileType);
 std::string ExtractNumericPrefix(const std::string& str);
 bool IsHiShellLabel();
 bool IsTaskManagerLabel();

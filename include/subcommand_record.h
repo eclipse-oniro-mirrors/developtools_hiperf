@@ -195,11 +195,7 @@ public:
         "         The information mainly consists of a mapping table between the PC and\n"
         "         the original shared library names.\n"
         "   -o <output_file_name>\n"
-#if defined(is_sandbox_mapping) && is_sandbox_mapping
         "         Set output file name, default is " + GetDefaultPathByEnv("perf.data") + ".\n"
-#else
-        "         Set output file name, default is /data/local/tmp/perf.data.\n"
-#endif
         "   -z\n"
         "         Compress record data.\n"
         "   --restart\n"
@@ -280,11 +276,7 @@ private:
     int cmdlinesSize_ = DEFAULT_SAVED_CMDLINES_SIZE;
     int oldCmdlinesSize_ = 0;
     std::vector<std::string> symbolDir_ = {};
-#if defined(is_sandbox_mapping) && is_sandbox_mapping
     std::string outputFilename_ = GetDefaultPathByEnv("perf.data");
-#else
-    std::string outputFilename_ = "/data/local/tmp/perf.data";
-#endif
     std::string appPackage_ = {};
     int checkAppMs_ = DEFAULT_CHECK_APP_MS;
     std::string clockId_ = {};
