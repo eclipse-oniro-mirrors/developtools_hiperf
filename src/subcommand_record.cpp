@@ -1202,6 +1202,7 @@ void SubCommandRecord::PrepareKernelMaps()
 
 bool SubCommandRecord::PrepareVirtualRuntime()
 {
+    virtualRuntime_.SetCallStackFp(isCallStackFp_);
     auto saveRecord = [this](PerfEventRecord& record) -> bool {
         if (!isRoot_) {
             UpdateDevHostMaps(record);

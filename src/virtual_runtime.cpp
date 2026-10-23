@@ -36,6 +36,7 @@ VirtualRuntime::VirtualRuntime(const bool onDevice)
         }
         int32_t id = static_cast<int32_t>(symbolsFiles_.size());
         symFile->id_ = id;
+        symFile->SetCallStackFp(isCallStackFp_);
         symbolsFiles_.emplace_back(std::move(symFile));
         return id;
     };

@@ -63,6 +63,8 @@ public:
     RuntimeContext& GetRuntimeContext() { return runtimeContext_; }
     const RuntimeContext& GetRuntimeContext() const { return runtimeContext_; }
     void SetRecordMode(const RecordCallBack &recordCallBack);
+    // Configure the sampling mode before registering symbols files.
+    void SetCallStackFp(bool isFp) { isCallStackFp_ = isFp; }
     void SetCollectSymbolCallBack(const CollectSymbolCallBack &collectSymbolCallBack);
     void SetSmoFlag(bool flag);
     int32_t RegisterSymbolsFile(std::unique_ptr<SymbolsFile> symbolsFile);
@@ -150,6 +152,7 @@ private:
     std::unique_ptr<SymbolManager> symbolManager_;
 
     std::vector<std::unique_ptr<SymbolsFile>> symbolsFiles_;
+    bool isCallStackFp_ = false;
     RuntimeContext runtimeContext_;
     SymbolsFileRegisterFunc symbolsFileRegisterFunc_;
 

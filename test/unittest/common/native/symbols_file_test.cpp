@@ -2112,6 +2112,54 @@ HWTEST_F(SymbolsFileTest, TestElfFileSymbolsGetSymbolWithPcAndMap, TestSize.Leve
     EXPECT_EQ(symbol.IsValid(), false);
 }
 
+/**
+ * @tc.name: HapFileGetSymbolWithPcAndMapMultiAbc
+ * @tc.desc: Test multi-abc map handles different begin addresses independently
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, HapFileGetSymbolWithPcAndMapMultiAbc, TestSize.Level1)
+{
+    const std::string filename = "/data/storage/test.hap";
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(filename);
+    ASSERT_NE(symbolsFile, nullptr);
+
+    uint64_t ip1 = 0x7000;
+    uint64_t begin1 = 0x700;
+    auto map1 = std::make_shared<DfxMap>(begin1, begin1 + 0x1000, 0x600, PROT_READ, filename);
+
+    uint64_t ip2 = 0x8000;
+    uint64_t begin2 = 0x800;
+    auto map2 = std::make_shared<DfxMap>(begin2, begin2 + 0x1000, 0x700, PROT_READ, filename);
+
+    auto symbol1 = symbolsFile->GetSymbolWithPcAndMap(ip1, map1);
+    auto symbol2 = symbolsFile->GetSymbolWithPcAndMap(ip2, map2);
+
+    EXPECT_EQ(symbol1.fileVaddr_, 0u);
+    EXPECT_EQ(symbol2.fileVaddr_, 0u);
+}
+
+/**
+ * @tc.name: HapFileGetSymbolWithPcAndMapFpMode
+ * @tc.desc: Test GetSymbolWithPcAndMap with FP mode keeps original ip for cache
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, HapFileGetSymbolWithPcAndMapFpMode, TestSize.Level1)
+{
+    const std::string filename = "/data/storage/test.hap";
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(filename);
+    ASSERT_NE(symbolsFile, nullptr);
+    symbolsFile->SetCallStackFp(true);
+
+    uint64_t ip = 0x6000;
+    uint64_t begin = 0x600;
+    auto map = std::make_shared<DfxMap>(begin, begin + 0x7000, 0x500, PROT_READ, filename);
+
+    auto symbol = symbolsFile->GetSymbolWithPcAndMap(ip, map);
+    EXPECT_EQ(symbol.matched_, false);
+    EXPECT_EQ(symbolsFile->symbolsMap_.count(ip), 1u);
+    EXPECT_EQ(symbolsFile->symbolsMap_.count(ip + 4), 0u);
+}
+
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS
