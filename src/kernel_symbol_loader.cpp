@@ -108,7 +108,8 @@ void KernelSymbolLoader::UpdateDevhostSymbols()
             if (koMaps.find(symbol.module_) == koMaps.end()) {
                 std::string filename = std::string(symbol.module_);
                 // [devhost] to /liblinux/devhost.ko
-                if (filename.size() >= 2 && filename.front() == '[' && filename.back() == ']') {
+                size_t minFilesize = 2;
+                if (filename.size() >= minFilesize && filename.front() == '[' && filename.back() == ']') {
                     filename.erase(filename.begin());
                     filename.erase(filename.end() - 1);
                 }
