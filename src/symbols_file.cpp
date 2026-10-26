@@ -370,7 +370,7 @@ private:
             HLOGE("mmapPtr should not be nullptr.");
             return false;
         }
-        CHECK_TRUE(shinfo.offset <= elfFile_->GetMmapSize() && shinfo.size <= elfFile_->GetMmapSize() - shinfo.offset
+        CHECK_TRUE(shinfo.offset <= elfFile_->GetMmapSize() && shinfo.size <= elfFile_->GetMmapSize() - shinfo.offset,
             false, 1, "eh_frame_hdr section out of mmap bounds");
         if (!LoadEhFrameHDR(mmapPtr + shinfo.offset, shinfo.size, shinfo.offset)) {
             HLOGW("Failed to load eh_frame_hdr");
