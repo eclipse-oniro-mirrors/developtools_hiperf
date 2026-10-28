@@ -94,6 +94,21 @@ void KernelSymbolLoader::UpdateServiceSymbols()
     }
 }
 
+namespace {
+std::unique_ptr<SymbolsFile> CreateKoSymbolsFile(std::string_view module)
+{
+    std::string filename(module);
+    // [devhost] to /liblinux/devhost.ko
+    constexpr size_t minFilesize = 2;
+    if (filename.size() >= minFilesize && filename.front() == '[' && filename.back() == ']') {
+        filename.erase(filename.begin());
+        filename.erase(filename.end() - 1);
+    }
+    filename = DEVHOST_LINUX_PREFIX + filename + KERNEL_MODULES_EXT_NAME;
+    return SymbolsFile::CreateSymbolsFile(SYMBOL_KERNEL_THREAD_FILE, filename);
+}
+}
+
 void KernelSymbolLoader::UpdateDevhostSymbols()
 {
     HLOGD("try to update kernel thread symbols for devhost");
@@ -106,13 +121,7 @@ void KernelSymbolLoader::UpdateDevhostSymbols()
     if (kallsyms->LoadSymbols()) {
         for (auto& symbol : kallsyms->GetSymbols()) {
             if (koMaps.find(symbol.module_) == koMaps.end()) {
-                std::string filename = std::string(symbol.module_);
-                // [devhost] to /liblinux/devhost.ko
-                filename.erase(filename.begin());
-                filename.erase(filename.end() - 1);
-                filename = DEVHOST_LINUX_PREFIX + filename + KERNEL_MODULES_EXT_NAME;
-                koMaps[symbol.module_] =
-                    SymbolsFile::CreateSymbolsFile(SYMBOL_KERNEL_THREAD_FILE, filename);
+                koMaps[symbol.module_] = CreateKoSymbolsFile(symbol.module_);
             }
             if (koMaps[symbol.module_] == nullptr) {
                 continue;

@@ -324,6 +324,17 @@ void Report::MergeCallFrameCount(ReportItem &leftItem, ReportItem &rightItem)
     while (rightCallFrames->size() != 0) {
         HLOG_ASSERT(rightCallFrames->size() == 1u);
         const ReportItemCallFrame &rightFrame = rightCallFrames->at(0);
+        if (leftCallFrames->empty()) {
+            // empty CallFrames : copy the whole right chain into left and stop.
+            leftCallFrames->emplace_back(rightFrame);
+            break;
+        }
+        if (leftCallFrames->data() == nullptr || leftCallFrames->size() > leftCallFrames->capacity()) {
+            HLOGE("MergeCallFrameCount:invalid leftCallFrames data = %p, size = %zu, cap = %zu, skip merge at level %d",
+                static_cast<const void *>(leftCallFrames->data()), leftCallFrames->size(),
+                leftCallFrames->capacity(), level);
+            break;
+        }
         auto leftFrameIt = std::find(leftCallFrames->begin(), leftCallFrames->end(), rightFrame);
         if (leftFrameIt == leftCallFrames->end()) {
             // new callfames
@@ -331,8 +342,7 @@ void Report::MergeCallFrameCount(ReportItem &leftItem, ReportItem &rightItem)
             HLOGV("%*s create frame %s in %s", level, "", leftCallFrame.ToDebugString().c_str(),
                   leftItem.ToDebugString().c_str());
             HLOG_ASSERT(leftCallFrame.eventCount_ <= maxEventCount);
-            // this is a new call stack ,
-            // all the child in rightFrame has been copy to left.
+            // this is a new call stack, all the child in rightFrame has been copy to left.
             break;
         } else {
             // already have , add count

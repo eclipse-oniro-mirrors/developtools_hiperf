@@ -56,7 +56,12 @@ const unsigned char *DwarfEncoding::GetData() const
 
 size_t DwarfEncoding::GetSize() const
 {
-    return DWFormatSizeMap.at((dw_encode_t)Format());
+    auto it = DWFormatSizeMap.find((dw_encode_t)Format());
+    if (it == DWFormatSizeMap.end()) {
+        HLOGW("unsupported DWARF encoding format 0x%x", Format());
+        return 0;
+    }
+    return it->second;
 }
 
 uint64_t DwarfEncoding::GetValue() const
