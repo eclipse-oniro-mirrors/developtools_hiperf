@@ -2587,12 +2587,7 @@ bool SubCommandRecord::FinishWriteRecordFile()
         if (mapPids_.empty()) {
             UpdateProcessSmoInfoForAllThreads();
         } else {
-            for (auto it = mapPids_.begin(); it != mapPids_.end(); ++it) {
-                const VirtualThread &thread = virtualRuntime_.GetThreads().at(it->first);
-                if (virtualRuntime_.UpdateProcessSmoInfo(thread)) {
-                    break;
-                }
-            }
+            UpdateProcessSmoInfoForSelectedThreads();
         }
     }
     CHECK_TRUE(!dedupStack_ || fileWriter_->AddUniStackTableFeature(virtualRuntime_.GetUniStackTable()), false, 0, "");
@@ -2617,6 +2612,16 @@ void SubCommandRecord::UpdateProcessSmoInfoForAllThreads()
             continue;
         }
         if (virtualRuntime_.UpdateProcessSmoInfo(threadItem.second)) {
+            break;
+        }
+    }
+}
+
+void SubCommandRecord::UpdateProcessSmoInfoForSelectedThreads()
+{
+    for (auto it = mapPids_.begin(); it != mapPids_.end(); ++it) {
+        const VirtualThread &thread = virtualRuntime_.GetThreads().at(it->first);
+        if (virtualRuntime_.UpdateProcessSmoInfo(thread)) {
             break;
         }
     }

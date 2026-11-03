@@ -460,6 +460,7 @@ private:
     void RemoveFifoFile();
     void UpdateMapPids();
     void UpdateProcessSmoInfoForAllThreads();
+    void UpdateProcessSmoInfoForSelectedThreads();
 
     VirtualRuntime virtualRuntime_;
 #if USE_COLLECT_SYMBOLIC
