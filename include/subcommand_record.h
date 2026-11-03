@@ -459,6 +459,7 @@ private:
     void RemoveVdsoTmpFile();
     void RemoveFifoFile();
     void UpdateMapPids();
+    void UpdateProcessSmoInfoForAllThreads();
 
     VirtualRuntime virtualRuntime_;
 #if USE_COLLECT_SYMBOLIC
