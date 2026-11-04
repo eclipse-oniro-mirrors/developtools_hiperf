@@ -1463,10 +1463,10 @@ std::string GetDefaultPathByEnv(const std::string fileType)
             HIPERF_HILOGE(MODULE_DEFAULT, "get TMPDIR env failed");
         }
     }
-#endif
     HIPERF_HILOGI(MODULE_DEFAULT,
                   "HIPERF_DEFAULT_OUTPUT_PATH file=%" HILOG_PUBLIC "s path=%" HILOG_PUBLIC "s",
                   fileType.c_str(), outputFilename.c_str());
+#endif
     return outputFilename;
 }
 

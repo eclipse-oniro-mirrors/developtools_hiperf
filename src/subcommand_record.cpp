@@ -2584,11 +2584,10 @@ bool SubCommandRecord::FinishWriteRecordFile()
 #endif
     ProcessSymbolsIfNeeded();
     if (virtualRuntime_.GetRuntimeContext().smoFlag) {
-        for (auto it = mapPids_.begin(); it != mapPids_.end(); ++it) {
-            const VirtualThread &thread = virtualRuntime_.GetThreads().at(it->first);
-            if (virtualRuntime_.UpdateProcessSmoInfo(thread)) {
-                break;
-            }
+        if (mapPids_.empty()) {
+            UpdateProcessSmoInfoForAllThreads();
+        } else {
+            UpdateProcessSmoInfoForSelectedThreads();
         }
     }
     CHECK_TRUE(!dedupStack_ || fileWriter_->AddUniStackTableFeature(virtualRuntime_.GetUniStackTable()), false, 0, "");
@@ -2604,6 +2603,28 @@ bool SubCommandRecord::FinishWriteRecordFile()
     saveFeatureTimes_ += duration_cast<microseconds>(steady_clock::now() - startTime);
 #endif
     return true;
+}
+
+void SubCommandRecord::UpdateProcessSmoInfoForAllThreads()
+{
+    for (const auto &threadItem : virtualRuntime_.GetThreads()) {
+        if (threadItem.second.pid_ != threadItem.second.tid_) {
+            continue;
+        }
+        if (virtualRuntime_.UpdateProcessSmoInfo(threadItem.second)) {
+            break;
+        }
+    }
+}
+
+void SubCommandRecord::UpdateProcessSmoInfoForSelectedThreads()
+{
+    for (auto it = mapPids_.begin(); it != mapPids_.end(); ++it) {
+        const VirtualThread &thread = virtualRuntime_.GetThreads().at(it->first);
+        if (virtualRuntime_.UpdateProcessSmoInfo(thread)) {
+            break;
+        }
+    }
 }
 
 bool SubCommandRecord::ProcessSymbolsIfNeeded()
