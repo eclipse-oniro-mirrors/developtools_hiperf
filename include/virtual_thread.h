@@ -90,6 +90,7 @@ public:
     int64_t FindMapIndexByAddr(const uint64_t addr) const;
     SymbolsFile *FindSymbolsFileByMap(std::shared_ptr<DfxMap> map) const;
     bool ReadRoMemory(const uint64_t vaddr, uint8_t *data, const size_t size) const;
+    bool IsContainerPid() const { return isContainerProcess_; }
 #ifdef HIPERF_DEBUG
     void ReportVaddrMapMiss(const uint64_t vaddr) const;
 #endif

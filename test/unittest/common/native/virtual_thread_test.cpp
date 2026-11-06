@@ -522,6 +522,46 @@ HWTEST_F(VirtualThreadTest, TestFindMapIndexByAddr, TestSize.Level2)
     EXPECT_EQ(index3, -1); // Returns -1 for invalid address
 }
 
+/**
+ * @tc.name: IsContainerPid_NonContainerProcess
+ * @tc.desc: Test IsContainerPid returns false for current (non-container) process
+ * @tc.type: FUNC
+ */
+HWTEST_F(VirtualThreadTest, IsContainerPid_NonContainerProcess, TestSize.Level1)
+{
+    std::vector<std::unique_ptr<SymbolsFile>> files;
+    VirtualThread thread(getpid(), files);
+    bool expected = IsContainerProcess(getpid());
+    EXPECT_EQ(thread.IsContainerPid(), expected);
+}
+
+/**
+ * @tc.name: IsContainerPid_InvalidPid
+ * @tc.desc: Test IsContainerPid returns false for invalid pid
+ * @tc.type: FUNC
+ */
+HWTEST_F(VirtualThreadTest, IsContainerPid_InvalidPid, TestSize.Level2)
+{
+    std::vector<std::unique_ptr<SymbolsFile>> files;
+    VirtualThread thread(-1, files);
+    EXPECT_EQ(thread.IsContainerPid(), false);
+}
+
+/**
+ * @tc.name: IsContainerPid_ConsistentWithIsContainerProcess
+ * @tc.desc: Test IsContainerPid matches IsContainerProcess result
+ * @tc.type: FUNC
+ */
+HWTEST_F(VirtualThreadTest, IsContainerPid_ConsistentWithIsContainerProcess, TestSize.Level2)
+{
+    std::vector<std::unique_ptr<SymbolsFile>> files;
+    pid_t pid = getpid();
+    VirtualThread thread(pid, files);
+    EXPECT_EQ(thread.IsContainerPid(), IsContainerProcess(pid));
+    EXPECT_EQ(thread.pid_, pid);
+    EXPECT_EQ(thread.tid_, pid);
+}
+
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS

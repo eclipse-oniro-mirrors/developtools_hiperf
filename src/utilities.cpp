@@ -1142,6 +1142,11 @@ bool IsArkwebV8File(const std::string& filepath)
             StringStartsWith(filepath, "[anon:JS_V8"));
 }
 
+bool IsJitFile(const std::string& filepath)
+{
+    return filepath.find("jit-cache") != std::string::npos;
+}
+
 bool IsHiviewCall()
 {
 #if defined(is_ohos) && is_ohos

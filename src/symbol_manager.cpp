@@ -153,6 +153,22 @@ std::string UserSymbolResolver::GetOriginSoName(const uint64_t ip, const Virtual
     return originSoName;
 }
 
+DfxSymbol UserSymbolResolver::LoadAndFindSymbol(SymbolsFile* symbolsFile, uint64_t ip,
+    uint64_t fileVaddr, std::shared_ptr<DfxMap> map, bool& isAbcOrJsEngine)
+{
+    if (!symbolsFile->SymbolsLoaded()) {
+        symbolsFile->LoadDebugInfo(map);
+        symbolsFile->LoadSymbols(map);
+    }
+    isAbcOrJsEngine = symbolsFile->IsAbc() || IsJsvmV8File(map->name) ||
+                      IsArkwebV8File(map->name) || IsJitFile(map->name);
+    if (!isAbcOrJsEngine) {
+        return symbolsFile->GetSymbolWithVaddr(fileVaddr);
+    }
+    HLOGD("symbolsFile:%s is ABC or JS engine :%d", symbolsFile->filePath_.c_str(), isAbcOrJsEngine);
+    return symbolsFile->GetSymbolWithPcAndMap(ip, map);
+}
+
 DfxSymbol UserSymbolResolver::Resolve(uint64_t ip, const VirtualThread& thread)
 {
     DfxSymbol vaddrSymbol(ip, thread.name_);
@@ -164,6 +180,7 @@ DfxSymbol UserSymbolResolver::Resolve(uint64_t ip, const VirtualThread& thread)
     }
 
     auto map = thread.GetMaps()[mapIndex];
+    vaddrSymbol.module_ = map->name;
     SymbolsFile* symbolsFile = thread.FindSymbolsFileByMap(map);
     if (symbolsFile == nullptr) {
         HLOGW("addr 0x%" PRIx64 " in map but NOT found the symbol file %s", ip, map->name.c_str());
@@ -178,19 +195,8 @@ DfxSymbol UserSymbolResolver::Resolve(uint64_t ip, const VirtualThread& thread)
     HLOGM("cache miss u %zu", GetCurrentCache().size());
     HLOGV("found symbol vaddr 0x%" PRIx64 " for runtime vaddr 0x%" PRIx64 " at '%s'",
           vaddrSymbol.fileVaddr_, ip, map->name.c_str());
-    if (!symbolsFile->SymbolsLoaded()) {
-        symbolsFile->LoadDebugInfo(map);
-        symbolsFile->LoadSymbols(map);
-    }
-    DfxSymbol foundSymbol;
-    bool isAbcOrJsEngine = symbolsFile->IsAbc() || IsJsvmV8File(map->name) || IsArkwebV8File(map->name);
-    if (!isAbcOrJsEngine) {
-        foundSymbol = symbolsFile->GetSymbolWithVaddr(vaddrSymbol.fileVaddr_);
-    } else {
-        HLOGD("symbolsFile:%s is ABC or JS engine :%d", symbolsFile->filePath_.c_str(), isAbcOrJsEngine);
-        foundSymbol = symbolsFile->GetSymbolWithPcAndMap(ip, map);
-    }
-
+    bool isAbcOrJsEngine = false;
+    DfxSymbol foundSymbol = LoadAndFindSymbol(symbolsFile, ip, vaddrSymbol.fileVaddr_, map, isAbcOrJsEngine);
     if (foundSymbol.IsValid()) {
         foundSymbol.map = map;
         foundSymbol.originSoName_ = originSoName;
@@ -292,13 +298,13 @@ DfxSymbol KernelThreadSymbolResolver::Resolve(uint64_t ip, const VirtualThread& 
           ip, map->begin, map->end, map->name.c_str());
 
     SymbolsFile* symbolsFile = FindSymbolsFile(map->name);
+    vaddrSymbol.module_ = map->name;
     if (!symbolsFile) {
         HLOGW("addr 0x%" PRIx64 " in map but NOT found the symbol file %s", ip, map->name.c_str());
         return vaddrSymbol;
     }
 
     vaddrSymbol.symbolFileIndex_ = symbolsFile->id_;
-    vaddrSymbol.module_ = map->name;
     vaddrSymbol.fileVaddr_ = symbolsFile->GetVaddrInSymbols(ip, map->begin, map->offset);
 
     if (GetFromCache(vaddrSymbol.fileVaddr_, vaddrSymbol)) {

@@ -414,6 +414,7 @@ bool GetDeveloperMode();
 bool IsArkJsFile(const std::string& filepath);
 bool IsJsvmV8File(const std::string& filepath);
 bool IsArkwebV8File(const std::string& filepath);
+bool IsJitFile(const std::string& filepath);
 std::string GetProcessName(const int pid);
 std::string HandleAppInfo(const std::string& appPackage, const std::vector<pid_t> &inputPidTidArgs);
 bool NeedAdaptSandboxPath(char *filename, const int pid, u16 &headerSize);
