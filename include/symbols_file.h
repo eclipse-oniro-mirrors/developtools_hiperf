@@ -82,6 +82,7 @@ enum SymbolsFileType {
     SYMBOL_CJ_FILE,
     SYMBOL_JSVM_V8_FILE,
     SYMBOL_ARKWEB_V8_FILE,
+    SYMBOL_JIT_FILE,
     SYMBOL_UNKNOW_FILE,
 };
 

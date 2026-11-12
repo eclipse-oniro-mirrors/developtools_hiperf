@@ -2138,6 +2138,166 @@ HWTEST_F(SymbolsFileTest, HapFileGetSymbolWithPcAndMapMultiAbc, TestSize.Level1)
     EXPECT_EQ(symbol2.fileVaddr_, 0u);
 }
 
+/**
+ * @tc.name: JitFileSymbols_CreateByType
+ * @tc.desc: Test creating JitFileSymbols via SYMBOL_JIT_FILE enum
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_CreateByType, TestSize.Level1)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", getpid());
+    ASSERT_NE(symbolsFile, nullptr);
+    EXPECT_EQ(symbolsFile->symbolFileType_, SYMBOL_JIT_FILE);
+}
+
+/**
+ * @tc.name: JitFileSymbols_CreateByPath
+ * @tc.desc: Test creating JitFileSymbols via path containing jit-cache
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_CreateByPath, TestSize.Level1)
+{
+    const std::string filename = "/data/local/tmp/jit-cache";
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(filename, getpid());
+    ASSERT_NE(symbolsFile, nullptr);
+    EXPECT_EQ(symbolsFile->symbolFileType_, SYMBOL_JIT_FILE);
+}
+
+/**
+ * @tc.name: JitFileSymbols_CreateByPathNoMatch
+ * @tc.desc: Test non-jit path does not create JitFileSymbols
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_CreateByPathNoMatch, TestSize.Level1)
+{
+    const std::string filename = "/system/lib/libtest.so";
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(filename, getpid());
+    ASSERT_NE(symbolsFile, nullptr);
+    EXPECT_NE(symbolsFile->symbolFileType_, SYMBOL_JIT_FILE);
+}
+
+/**
+ * @tc.name: JitFileSymbols_LoadDebugInfo
+ * @tc.desc: Test LoadDebugInfo returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_LoadDebugInfo, TestSize.Level2)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", getpid());
+    ASSERT_NE(symbolsFile, nullptr);
+    auto map = std::make_shared<DfxMap>(0x1000, 0x2000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+    EXPECT_EQ(symbolsFile->LoadDebugInfo(map, "jit-cache"), true);
+}
+
+/**
+ * @tc.name: JitFileSymbols_LoadSymbols
+ * @tc.desc: Test LoadSymbols sets symbolsLoaded_ flag
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_LoadSymbols, TestSize.Level2)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", getpid());
+    ASSERT_NE(symbolsFile, nullptr);
+    symbolsFile->onRecording_ = true;
+    auto map = std::make_shared<DfxMap>(0x1000, 0x2000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+    EXPECT_EQ(symbolsFile->LoadSymbols(map, "jit-cache"), true);
+    EXPECT_EQ(symbolsFile->symbolsLoaded_, true);
+    EXPECT_EQ(symbolsFile->LoadSymbols(map, "jit-cache"), true);
+}
+
+/**
+ * @tc.name: JitFileSymbols_GetSymbolWithPcAndMapEmpty
+ * @tc.desc: Test GetSymbolWithPcAndMap returns unnamed symbol when no JIT symbols loaded
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_GetSymbolWithPcAndMapEmpty, TestSize.Level1)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", -1);
+    ASSERT_NE(symbolsFile, nullptr);
+    uint64_t pc = 0x5000;
+    auto map = std::make_shared<DfxMap>(0x1000, 0x9000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+    auto symbol = symbolsFile->GetSymbolWithPcAndMap(pc, map);
+    EXPECT_EQ(symbol.IsValid(), false);
+    EXPECT_TRUE(symbol.GetName().find("jit-cache") != std::string::npos);
+}
+
+/**
+ * @tc.name: JitFileSymbols_GetSymbolWithPcAndMapNullMap
+ * @tc.desc: Test GetSymbolWithPcAndMap handles null map
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_GetSymbolWithPcAndMapNullMap, TestSize.Level2)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", -1);
+    ASSERT_NE(symbolsFile, nullptr);
+    uint64_t pc = 0x5000;
+    std::shared_ptr<DfxMap> map = nullptr;
+    auto symbol = symbolsFile->GetSymbolWithPcAndMap(pc, map);
+    EXPECT_EQ(symbol.IsValid(), false);
+}
+
+/**
+ * @tc.name: JitFileSymbols_GetSymbolWithPcAndMapSeeded
+ * @tc.desc: Test GetSymbolWithPcAndMap returns correct symbol when symbols are seeded
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_GetSymbolWithPcAndMapSeeded, TestSize.Level1)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", -1);
+    ASSERT_NE(symbolsFile, nullptr);
+    symbolsFile->onRecording_ = true;
+    symbolsFile->symbols_.emplace_back(0x1000, 0x200, "jit_func_a", "jit_func_a", "jit-cache");
+    symbolsFile->symbols_.emplace_back(0x2000, 0x100, "jit_func_b", "jit_func_b", "jit-cache");
+    symbolsFile->AdjustSymbols();
+    ASSERT_EQ(symbolsFile->GetSymbols().empty(), false);
+
+    auto map = std::make_shared<DfxMap>(0x0, 0x10000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+
+    auto symbol = symbolsFile->GetSymbolWithPcAndMap(0x1050, map);
+    EXPECT_EQ(symbol.IsValid(), true);
+    EXPECT_EQ(symbol.GetName(), "jit_func_a");
+
+    symbol = symbolsFile->GetSymbolWithPcAndMap(0x2050, map);
+    EXPECT_EQ(symbol.IsValid(), true);
+    EXPECT_EQ(symbol.GetName(), "jit_func_b");
+}
+
+/**
+ * @tc.name: JitFileSymbols_GetSymbolWithPcAndMapNoMatch
+ * @tc.desc: Test GetSymbolWithPcAndMap returns unnamed symbol when pc not in any symbol range
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_GetSymbolWithPcAndMapNoMatch, TestSize.Level2)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", -1);
+    ASSERT_NE(symbolsFile, nullptr);
+    symbolsFile->onRecording_ = true;
+    symbolsFile->symbols_.emplace_back(0x1000, 0x200, "jit_func_a", "jit_func_a", "jit-cache");
+    symbolsFile->AdjustSymbols();
+
+    auto map = std::make_shared<DfxMap>(0x0, 0x10000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+    auto symbol = symbolsFile->GetSymbolWithPcAndMap(0x9000, map);
+    EXPECT_EQ(symbol.IsValid(), false);
+    EXPECT_TRUE(symbol.GetName().find("jit-cache") != std::string::npos);
+}
+
+/**
+ * @tc.name: JitFileSymbols_GetSymbolWithPcAndMapOnce
+ * @tc.desc: Test multiple GetSymbolWithPcAndMap calls don't re-trigger loading
+ * @tc.type: FUNC
+ */
+HWTEST_F(SymbolsFileTest, JitFileSymbols_GetSymbolWithPcAndMapOnce, TestSize.Level2)
+{
+    auto symbolsFile = SymbolsFile::CreateSymbolsFile(SYMBOL_JIT_FILE, "jit-cache", -1);
+    ASSERT_NE(symbolsFile, nullptr);
+    auto map = std::make_shared<DfxMap>(0x0, 0x10000, 0, PROT_READ | PROT_EXEC, "jit-cache");
+    symbolsFile->GetSymbolWithPcAndMap(0x1000, map);
+    auto symbolsFirst = symbolsFile->GetSymbols();
+    symbolsFile->GetSymbolWithPcAndMap(0x2000, map);
+    auto symbolsSecond = symbolsFile->GetSymbols();
+    EXPECT_EQ(symbolsFirst.size(), symbolsSecond.size());
+}
+
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS

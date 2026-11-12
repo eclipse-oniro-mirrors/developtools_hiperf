@@ -113,6 +113,9 @@ public:
     DfxSymbol Resolve(uint64_t ip, const VirtualThread& thread) override;
     std::string GetType() const override { return "UserSymbol"; }
 
+    DfxSymbol LoadAndFindSymbol(SymbolsFile* symbolsFile, uint64_t ip,
+        uint64_t fileVaddr, std::shared_ptr<DfxMap> map, bool& isAbcOrJsEngine);
+
 private:
     const RuntimeContext& ctx_;
     mutable std::shared_mutex soMappingMutex_;
