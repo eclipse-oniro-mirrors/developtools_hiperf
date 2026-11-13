@@ -489,6 +489,7 @@ ohos_executable("hiperf") {
 }
 
 ohos_executable("hiperf_host") {
+  branch_protector_ret = "pac_ret"
   install_enable = false
   sources = [ "./src/main.cpp" ]
 
@@ -554,6 +555,7 @@ group("hiperf_etc") {
 }
 
 ohos_source_set("hiperf_platform_host") {
+  branch_protector_ret = "pac_ret"
   part_name = "hiperf"
   subsystem_name = "developtools"
   public_configs = common_configs
@@ -576,6 +578,7 @@ ohos_source_set("hiperf_platform_host") {
 }
 
 ohos_shared_library("hiperf_host_lib") {
+  branch_protector_ret = "pac_ret"
   install_enable = false
   if (!is_ohos) {
     deps = [ ":hiperf_platform_host" ]
@@ -588,6 +591,7 @@ ohos_shared_library("hiperf_host_lib") {
 }
 
 ohos_executable("hiperf_host_lib_demo") {
+  branch_protector_ret = "pac_ret"
   install_enable = false
   sources = [ "./src/hiperf_libreport_demo.cpp" ]
 
