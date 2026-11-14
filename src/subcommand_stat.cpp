@@ -767,8 +767,6 @@ bool SubCommandStat::CreateFifoServer()
         return false;
     }
     if (pid == 0) {
-        fdsan_exchange_owner_tag(STDIN_FILENO, 0, HIPERF_FD_TAG);
-        fdsan_exchange_owner_tag(STDERR_FILENO, 0, HIPERF_FD_TAG);
         return HandleChildProcess();
     }
     return HandleParentProcess(pid);
@@ -776,8 +774,6 @@ bool SubCommandStat::CreateFifoServer()
 
 bool SubCommandStat::HandleChildProcess()
 {
-    fdsan_close_with_tag(STDIN_FILENO, HIPERF_FD_TAG);
-    fdsan_close_with_tag(STDERR_FILENO, HIPERF_FD_TAG);
     isFifoServer_ = true;
 
     clientPipeOutput_ = open(fifoFileS2C_.c_str(), O_WRONLY);
@@ -791,9 +787,7 @@ bool SubCommandStat::HandleChildProcess()
     }
     fdsan_exchange_owner_tag(clientPipeOutput_, 0, HIPERF_FD_TAG);
 
-    nullFd_ = open("/dev/null", O_WRONLY);
-    fdsan_exchange_owner_tag(nullFd_, 0, HIPERF_FD_TAG);
-    (void)dup2(nullFd_, STDOUT_FILENO); // redirect stdout to /dev/null
+    DetachStdFds();
 
     std::string err = OHOS::Developtools::HiPerf::HandleAppInfo(appPackage_, inputPidTidArgs_);
     if (!err.empty()) {
@@ -1074,9 +1068,6 @@ void SubCommandStat::CloseClientThread()
     if (clientCommandHandle_.joinable()) {
         clientRunning_.store(false);
         HLOGI("CloseClientThread");
-        if (nullFd_ != -1) {
-            fdsan_close_with_tag(nullFd_, HIPERF_FD_TAG);
-        }
         clientCommandHandle_.join();
         fdsan_close_with_tag(clientPipeInput_, HIPERF_FD_TAG);
         fdsan_close_with_tag(clientPipeOutput_, HIPERF_FD_TAG);

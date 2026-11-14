@@ -2917,6 +2917,42 @@ HWTEST_F(UtilitiesTest, StringSplit_EdgeCases, TestSize.Level2)
     EXPECT_EQ(StringSplit("abc", "abc").size(), 0u);
 }
 
+/**
+ * @tc.name: DetachStdFds_RedirectsToDevNull
+ * @tc.desc: Test DetachStdFds redirects stdin/stdout/stderr to /dev/null.
+ *           After call, write succeeds and read returns EOF.
+ * @tc.type: FUNC
+ */
+#if defined(is_ohos) && is_ohos
+HWTEST_F(UtilitiesTest, DetachStdFds_RedirectsToDevNull, TestSize.Level2)
+{
+    int savedIn = dup(STDIN_FILENO);
+    int savedOut = dup(STDOUT_FILENO);
+    int savedErr = dup(STDERR_FILENO);
+    ASSERT_GE(savedIn, 0);
+    ASSERT_GE(savedOut, 0);
+    ASSERT_GE(savedErr, 0);
+
+    DetachStdFds();
+
+    // write to redirected stdout/stderr should succeed (data goes to /dev/null)
+    EXPECT_GT(write(STDOUT_FILENO, "x", 1), 0);
+    EXPECT_GT(write(STDERR_FILENO, "x", 1), 0);
+
+    // read from redirected stdin should return 0 (EOF)
+    char buf[1];
+    EXPECT_EQ(read(STDIN_FILENO, buf, sizeof(buf)), 0);
+
+    // restore original fds so test framework output is not lost
+    dup2(savedIn, STDIN_FILENO);
+    dup2(savedOut, STDOUT_FILENO);
+    dup2(savedErr, STDERR_FILENO);
+    close(savedIn);
+    close(savedOut);
+    close(savedErr);
+}
+#endif
+
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS

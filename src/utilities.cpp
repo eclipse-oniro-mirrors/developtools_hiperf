@@ -1582,6 +1582,21 @@ bool IsContainerProcess(pid_t pid)
     HLOGD("IsContainerProcess pid %d: %s (NSpid count %d)", pid, isContainer ? "true" : "false", pidCount);
     return isContainer;
 }
+
+void DetachStdFds()
+{
+#if defined(is_ohos) && is_ohos
+    int nullFd = open("/dev/null", O_RDWR);
+    if (nullFd < 0) {
+        return;
+    }
+    fdsan_exchange_owner_tag(nullFd, 0, HIPERF_FD_TAG);
+    dup2(nullFd, STDIN_FILENO);
+    dup2(nullFd, STDOUT_FILENO);
+    dup2(nullFd, STDERR_FILENO);
+    fdsan_close_with_tag(nullFd, HIPERF_FD_TAG);
+#endif
+}
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS
