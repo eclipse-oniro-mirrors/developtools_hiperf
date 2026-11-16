@@ -1393,10 +1393,13 @@ void SubCommandRecord::OutputRecordFile()
         }
     }
 
-    if (!FinishWriteRecordFile()) {
-        HLOGE("output record failed");
+    {
+        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        if (!FinishWriteRecordFile()) {
+            HLOGE("output record failed");
+        }
+        fileWriter_ = nullptr;
     }
-    fileWriter_ = nullptr;
 }
 
 bool SubCommandRecord::PostOutputRecordFile(const bool output)
@@ -1405,7 +1408,10 @@ bool SubCommandRecord::PostOutputRecordFile(const bool output)
         OutputRecordFile();
     }
 
-    fileWriter_ = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        fileWriter_ = nullptr;
+    }
     outputEnd_ = true;
     perfPipe_.SetOutPutEnd(outputEnd_);
     StringViewHold::Get().Clean();
@@ -1995,6 +2001,7 @@ bool SubCommandRecord::SaveRecord(const PerfEventRecord& record)
         checkCallback_(record);
     }
 #endif
+    std::lock_guard<std::mutex> lock(fileWriterMutex_);
     if (fileWriter_ == nullptr) {
         return false;
     }
@@ -2220,6 +2227,7 @@ bool SubCommandRecord::AddFeatureRecordFile()
 
 bool SubCommandRecord::CreateInitRecordFile(const bool compressData)
 {
+    std::lock_guard<std::mutex> lock(fileWriterMutex_);
     if (fileWriter_ == nullptr) {
         fileWriter_ = std::make_unique<PerfFileWriter>();
     }
@@ -2250,7 +2258,10 @@ bool SubCommandRecord::PostProcessRecordFile()
 
         // renew record file
         // release the old one
-        fileWriter_.reset();
+        {
+            std::lock_guard<std::mutex> lock(fileWriterMutex_);
+            fileWriter_.reset();
+        }
         if (!CreateInitRecordFile(compressData_)) {
             // create again
 #if defined(is_sandbox_mapping) && is_sandbox_mapping

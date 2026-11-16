@@ -565,7 +565,7 @@ private:
     std::condition_variable cvRecordBuf_;
     std::thread readRecordBufThread_;
     std::atomic_bool readRecordThreadRunning_ = false;
-    bool startedTracking_ = false;
+    std::atomic_bool startedTracking_ = false;
     bool isLowPriorityThread_ = false;
     void RecordLoop();
     void StatLoop();
@@ -748,9 +748,9 @@ private:
 
     // for background track
     bool backtrack_ = false;
-    bool outputTracking_ = false;
+    std::atomic_bool outputTracking_ = false;
     uint64_t backtrackTime_ = 0;
-    uint64_t outputEndTime_ = 0;
+    std::atomic<uint64_t> outputEndTime_ = 0;
     bool IsSkipRecordForBacktrack(const PerfRecordSample& sample);
     void ProcessEventGroupItems(__u64 durationInSec);
     bool HandleTokensTracePoint(const std::vector<std::string>& eventTokens, std::string& name,

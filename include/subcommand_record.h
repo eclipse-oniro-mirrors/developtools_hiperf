@@ -26,6 +26,7 @@
 #define USE_COLLECT_SYMBOLIC             1
 
 #include <functional>
+#include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -337,6 +338,7 @@ private:
     uint64_t dataSizeLimit_ = 0;
     bool isDataSizeLimitStop_ = false;
 
+    std::mutex fileWriterMutex_;
     std::unique_ptr<PerfFileWriter> fileWriter_ = nullptr;
 
     // for client
