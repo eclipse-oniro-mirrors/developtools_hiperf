@@ -189,6 +189,7 @@ private:
     // for client
     int clientPipeInput_ = -1;
     int clientPipeOutput_ = -1;
+    int nullFd_ = -1;
     FILE* filePtr_ = nullptr;
     std::thread clientCommandHandle_;
     std::atomic_bool clientRunning_ = true;

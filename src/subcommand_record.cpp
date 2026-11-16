@@ -1593,6 +1593,8 @@ bool SubCommandRecord::CreateFifoServer()
         fdsan_close_with_tag(pipeFd[PIPE_WRITE], HIPERF_FD_TAG);
         return false;
     } else if (pid == 0) { // child process
+        fdsan_exchange_owner_tag(STDIN_FILENO, 0, HIPERF_FD_TAG);
+        fdsan_exchange_owner_tag(STDERR_FILENO, 0, HIPERF_FD_TAG);
         HandleChildProcess(pipeFd);
         return true;
     } else {            // parent process
@@ -1602,10 +1604,14 @@ bool SubCommandRecord::CreateFifoServer()
 
 void SubCommandRecord::HandleChildProcess(int pipeFd[2])
 {
+    fdsan_close_with_tag(STDIN_FILENO, HIPERF_FD_TAG);
+    fdsan_close_with_tag(STDERR_FILENO, HIPERF_FD_TAG);
     fdsan_close_with_tag(pipeFd[PIPE_READ], HIPERF_FD_TAG);
     writeFd_ = pipeFd[PIPE_WRITE];
     isFifoServer_ = true;
-    DetachStdFds();
+    nullFd_ = open("/dev/null", O_WRONLY);
+    fdsan_exchange_owner_tag(nullFd_, 0, HIPERF_FD_TAG);
+    (void)dup2(nullFd_, STDOUT_FILENO); // redirect stdout to /dev/null
 }
 
 bool SubCommandRecord::HandleParentProcess(int pipeFd[2], pid_t pid)
@@ -1890,6 +1896,9 @@ void SubCommandRecord::CloseClientThread()
     if (clientCommandHandle_.joinable()) {
         clientRunning_.store(false);
         HLOGI("CloseClientThread");
+        if (nullFd_ != -1) {
+            fdsan_close_with_tag(nullFd_, HIPERF_FD_TAG);
+        }
         clientCommandHandle_.join();
         fdsan_close_with_tag(clientPipeInput_, HIPERF_FD_TAG);
         fdsan_close_with_tag(clientPipeOutput_, HIPERF_FD_TAG);

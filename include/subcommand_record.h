@@ -344,6 +344,7 @@ private:
     int clientPipeOutput_ = -1;
     int readFd_ = -1;
     int writeFd_ = -1;
+    int nullFd_ = -1;
     std::thread clientCommandHandle_;
     std::thread replyCommandHandle_;
     std::atomic_bool clientRunning_ = true;

@@ -453,7 +453,6 @@ bool IsHiShellLabel();
 bool IsTaskManagerLabel();
 bool IsAllowSkipDeveloperMode();
 bool IsContainerProcess(pid_t pid);
-void DetachStdFds();
 } // namespace HiPerf
 } // namespace Developtools
 } // namespace OHOS
