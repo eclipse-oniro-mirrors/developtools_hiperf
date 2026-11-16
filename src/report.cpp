@@ -330,9 +330,8 @@ void Report::MergeCallFrameCount(ReportItem &leftItem, ReportItem &rightItem)
             break;
         }
         if (leftCallFrames->data() == nullptr || leftCallFrames->size() > leftCallFrames->capacity()) {
-            HLOGE("MergeCallFrameCount:invalid leftCallFrames data = %p, size = %zu, cap = %zu, skip merge at level %d",
-                static_cast<const void *>(leftCallFrames->data()), leftCallFrames->size(),
-                leftCallFrames->capacity(), level);
+            HLOGE("MergeCallFrameCount:invalid leftCallFrames size = %zu, cap = %zu, skip merge at level %d",
+                leftCallFrames->size(), leftCallFrames->capacity(), level);
             break;
         }
         auto leftFrameIt = std::find(leftCallFrames->begin(), leftCallFrames->end(), rightFrame);

@@ -15,6 +15,7 @@ import("//build/ohos.gni")
 import("../../hiperf.gni")
 
 ohos_executable("hiperf_demo") {
+  branch_protector_ret = "pac_ret"
   deps = [
     "${hiperf_path}/interfaces/innerkits/native/hiperf_client:hiperf_client",
   ]
@@ -24,6 +25,7 @@ ohos_executable("hiperf_demo") {
 }
 
 ohos_executable("hiperf_example_cmd") {
+  branch_protector_ret = "pac_ret"
   cflags = [ "-O0" ]
   sources = [ "hiperf_example_cmd.cpp" ]
   subsystem_name = "developtools"
