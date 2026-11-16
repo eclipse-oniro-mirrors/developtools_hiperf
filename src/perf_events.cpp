@@ -1858,9 +1858,9 @@ bool PerfEvents::CutStackAndMove(MmapFd &mmap)
     }
     size_t dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
     if (dynSizePos > mmap.header.size || mmap.header.size - dynSizePos < sizeof(uint64_t)) {
-         HLOGEP("invalid syn size position %zu, record size %u", dynSizePos,
+        HLOGEP("invalid syn size position %zu, record size %u", dynSizePos,
             static_cast<unsigned int>(mmap.header.size));
-        return false;       
+        return false;
     }
     uint64_t dynSize = 0;
     GetRecordFieldFromMmap(mmap, &dynSize, mmap.mmapPage->data_tail + dynSizePos, sizeof(dynSize));
