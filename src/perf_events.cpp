@@ -2004,15 +2004,15 @@ void PerfEvents::ReadRecordFromBuf()
 
     while (readRecordThreadRunning_) {
         WaitDataFromRingBuffer();
-        bool output = outputTracking_;
+        bool output = outputTracking_.load(std::memory_order_acquire);
         while ((p = recordBuf_->GetReadData()) != nullptr) {
             if (!ProcessRecord(attr, p)) {
                 break;
             }
         }
         if (backtrack_ && output) {
-            outputTracking_ = false;
-            outputEndTime_ = 0;
+            outputTracking_.store(false, std::memory_order_release);
+            outputEndTime_.store(0, std::memory_order_relaxed);
         }
     }
     HLOGD("exit because trackStoped");
@@ -2213,11 +2213,11 @@ void PerfEvents::UpdateCurrentTime()
 // check if this record should be saved, this function only can called in back track mode
 bool PerfEvents::IsSkipRecordForBacktrack(const PerfRecordSample& sample)
 {
-    if (outputTracking_) {
+    if (outputTracking_.load(std::memory_order_acquire)) {
         // when outputing record, only skip what later than end time
-        if (sample.GetTime() / NANO_SECONDS_PER_SECOND > outputEndTime_) {
-            outputTracking_ = false;
-            outputEndTime_ = 0;
+        if (sample.GetTime() / NANO_SECONDS_PER_SECOND > outputEndTime_.load(std::memory_order_relaxed)) {
+            outputTracking_.store(false, std::memory_order_release);
+            outputEndTime_.store(0, std::memory_order_relaxed);
             return true;
         }
         return false;
