@@ -1394,7 +1394,7 @@ void SubCommandRecord::OutputRecordFile()
     }
 
     {
-        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
         if (!FinishWriteRecordFile()) {
             HLOGE("output record failed");
         }
@@ -1409,7 +1409,7 @@ bool SubCommandRecord::PostOutputRecordFile(const bool output)
     }
 
     {
-        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
         fileWriter_ = nullptr;
     }
     outputEnd_ = true;
@@ -2001,7 +2001,7 @@ bool SubCommandRecord::SaveRecord(const PerfEventRecord& record)
         checkCallback_(record);
     }
 #endif
-    std::lock_guard<std::mutex> lock(fileWriterMutex_);
+    std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
     if (fileWriter_ == nullptr) {
         return false;
     }
@@ -2227,7 +2227,7 @@ bool SubCommandRecord::AddFeatureRecordFile()
 
 bool SubCommandRecord::CreateInitRecordFile(const bool compressData)
 {
-    std::lock_guard<std::mutex> lock(fileWriterMutex_);
+    std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
     if (fileWriter_ == nullptr) {
         fileWriter_ = std::make_unique<PerfFileWriter>();
     }
@@ -2259,7 +2259,7 @@ bool SubCommandRecord::PostProcessRecordFile()
         // renew record file
         // release the old one
         {
-            std::lock_guard<std::mutex> lock(fileWriterMutex_);
+            std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
             fileWriter_.reset();
         }
         if (!CreateInitRecordFile(compressData_)) {
