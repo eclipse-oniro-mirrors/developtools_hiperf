@@ -1393,12 +1393,21 @@ void SubCommandRecord::OutputRecordFile()
         }
     }
 
+    std::unique_ptr<PerfFileWriter> writer;
     {
-        std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
-        if (!FinishWriteRecordFile()) {
-            HLOGE("output record failed");
-        }
-        fileWriter_ = nullptr;
+        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        writer = std::move(fileWriter_);
+    }
+    if (writer == nullptr) {
+        return;
+    }
+    // clear tls before writer destructs on any exit path
+    struct TlsWriterGuard {
+        ~TlsWriterGuard() { tlsFinalizingWriter_ = nullptr; }
+    } tlsWriterGuard;
+    tlsFinalizingWriter_ = writer.get();
+    if (!FinishWriteRecordFile(writer.get())) {
+        HLOGE("output record failed");
     }
 }
 
@@ -1409,7 +1418,7 @@ bool SubCommandRecord::PostOutputRecordFile(const bool output)
     }
 
     {
-        std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
+        std::lock_guard<std::mutex> lock(fileWriterMutex_);
         fileWriter_ = nullptr;
     }
     outputEnd_ = true;
@@ -1835,11 +1844,14 @@ HiperfError SubCommandRecord::StartSamplingAndFile()
 
     if (isSpe_) {
         HLOGD("stop write spe record");
-        fileWriter_->SetWriteRecordStat(false);
+        std::lock_guard<std::mutex> lock(fileWriterMutex_);
+        if (fileWriter_ != nullptr) {
+            fileWriter_->SetWriteRecordStat(false);
+        }
     }
     startSaveFileTimes_ = steady_clock::now();
     if (!backtrack_) {
-        if (!FinishWriteRecordFile()) {
+        if (!FinishWriteRecordFile(fileWriter_.get())) {
             HLOGE("Fail to finish record file %s", outputFilename_.c_str());
             HIPERF_HILOGE(MODULE_DEFAULT, "Fail to finish record file");
             return HiperfError::FINISH_WRITE_RECORD_FILE_FAIL;
@@ -1994,6 +2006,8 @@ bool SubCommandRecord::ProcessRecord(PerfEventRecord& record)
 #endif
 }
 
+thread_local PerfFileWriter *SubCommandRecord::tlsFinalizingWriter_ = nullptr;
+
 bool SubCommandRecord::SaveRecord(const PerfEventRecord& record)
 {
 #ifdef HIPERF_UNITTEST
@@ -2001,18 +2015,21 @@ bool SubCommandRecord::SaveRecord(const PerfEventRecord& record)
         checkCallback_(record);
     }
 #endif
-    std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
-    if (fileWriter_ == nullptr) {
-        return false;
+    PerfFileWriter *writer = tlsFinalizingWriter_;
+    std::unique_lock<std::mutex> lock;
+    if (writer == nullptr) {
+        lock = std::unique_lock<std::mutex>(fileWriterMutex_);
+        writer = fileWriter_.get();
     }
+    CHECK_TRUE(writer != nullptr, false, 0, "");
 #if HIDEBUG_RECORD_NOT_SAVE
     return true;
 #endif
     if (dataSizeLimit_ > 0u) {
-        if (dataSizeLimit_ <= fileWriter_->GetDataSize()) {
+        if (dataSizeLimit_ <= writer->GetDataSize()) {
             CHECK_TRUE(!isDataSizeLimitStop_, false, 0, "");
             printf("record size %" PRIu64 " is large than limit %" PRIu64 ". stop sampling.\n",
-                fileWriter_->GetDataSize(), dataSizeLimit_);
+                writer->GetDataSize(), dataSizeLimit_);
             perfEvents_.StopTracking();
             isDataSizeLimitStop_ = true;
             return false;
@@ -2023,7 +2040,7 @@ bool SubCommandRecord::SaveRecord(const PerfEventRecord& record)
 #ifdef HIPERF_DEBUG_TIME
         const auto saveTime = steady_clock::now();
 #endif
-        if (!fileWriter_->WriteRecord(record)) {
+        if (!writer->WriteRecord(record)) {
             // write file failed, need stop record
             perfEvents_.StopTracking();
             HLOGV("fail to write record %s", record.GetName());
@@ -2227,7 +2244,7 @@ bool SubCommandRecord::AddFeatureRecordFile()
 
 bool SubCommandRecord::CreateInitRecordFile(const bool compressData)
 {
-    std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
+    std::lock_guard<std::mutex> lock(fileWriterMutex_);
     if (fileWriter_ == nullptr) {
         fileWriter_ = std::make_unique<PerfFileWriter>();
     }
@@ -2259,7 +2276,7 @@ bool SubCommandRecord::PostProcessRecordFile()
         // renew record file
         // release the old one
         {
-            std::lock_guard<std::recursive_mutex> lock(fileWriterMutex_);
+            std::lock_guard<std::mutex> lock(fileWriterMutex_);
             fileWriter_.reset();
         }
         if (!CreateInitRecordFile(compressData_)) {
@@ -2297,7 +2314,7 @@ bool SubCommandRecord::PostProcessRecordFile()
 
         // lte FinishWriteRecordFile write matched only symbols
         delayUnwind_ = false;
-        CHECK_TRUE(FinishWriteRecordFile(), false, 1, "Fail to finish record file %s", outputFilename_.c_str());
+        CHECK_TRUE(FinishWriteRecordFile(fileWriter_.get()), false, 1, "Fail to finish record file %s", outputFilename_.c_str());
 
         remove(tempFileName.c_str());
     }
@@ -2588,12 +2605,13 @@ void SubCommandRecord::CollectSymbol(PerfRecordSample *sample)
     }
 }
 
-bool SubCommandRecord::FinishWriteRecordFile()
+bool SubCommandRecord::FinishWriteRecordFile(PerfFileWriter *writer)
 {
+    CHECK_TRUE(writer != nullptr, false, 0, "");
 #ifdef HIPERF_DEBUG_TIME
     const auto startTime = steady_clock::now();
 #endif
-    ProcessSymbolsIfNeeded();
+    ProcessSymbolsIfNeeded(writer);
     if (virtualRuntime_.GetRuntimeContext().smoFlag) {
         if (mapPids_.empty()) {
             UpdateProcessSmoInfoForAllThreads();
@@ -2601,7 +2619,7 @@ bool SubCommandRecord::FinishWriteRecordFile()
             UpdateProcessSmoInfoForSelectedThreads();
         }
     }
-    CHECK_TRUE(!dedupStack_ || fileWriter_->AddUniStackTableFeature(virtualRuntime_.GetUniStackTable()), false, 0, "");
+    CHECK_TRUE(!dedupStack_ || writer->AddUniStackTableFeature(virtualRuntime_.GetUniStackTable()), false, 0, "");
 
     if (!delayUnwind_) {
         virtualRuntime_.ReleaseRecordResources();
@@ -2609,7 +2627,7 @@ bool SubCommandRecord::FinishWriteRecordFile()
     }
 
     CleanupForBacktrack();
-    CHECK_TRUE(fileWriter_->Close(), false, 1, "Fail to close record file %s", outputFilename_.c_str());
+    CHECK_TRUE(writer->Close(), false, 1, "Fail to close record file %s", outputFilename_.c_str());
 #ifdef HIPERF_DEBUG_TIME
     saveFeatureTimes_ += duration_cast<microseconds>(steady_clock::now() - startTime);
 #endif
@@ -2638,12 +2656,12 @@ void SubCommandRecord::UpdateProcessSmoInfoForSelectedThreads()
     }
 }
 
-bool SubCommandRecord::ProcessSymbolsIfNeeded()
+bool SubCommandRecord::ProcessSymbolsIfNeeded(PerfFileWriter *writer)
 {
 #if !HIDEBUG_SKIP_PROCESS_SYMBOLS
     if (!delayUnwind_) {
         UpdateKernelRelatedSymbols();
-        if (!ProcessUserSymbols()) {
+        if (!ProcessUserSymbols(writer)) {
             return false;
         }
     }
@@ -2678,13 +2696,13 @@ void SubCommandRecord::UpdateMapPids()
     }
 }
 
-bool SubCommandRecord::ProcessUserSymbols()
+bool SubCommandRecord::ProcessUserSymbols(PerfFileWriter *writer)
 {
     HLOGD("Load user symbols");
     if (dedupStack_) {
         virtualRuntime_.CollectDedupSymbol(kernelSymbolsHits_, userSymbolsHits_);
     } else {
-        fileWriter_->ReadDataSection(
+        writer->ReadDataSection(
             [this](PerfEventRecord& record) -> bool {
                 return this->CollectionSymbol(record);
             });
@@ -2699,7 +2717,7 @@ bool SubCommandRecord::ProcessUserSymbols()
 #endif
 
 #if !HIDEBUG_SKIP_SAVE_SYMBOLS
-    CHECK_TRUE(fileWriter_->AddSymbolsFeature(virtualRuntime_.GetSymbolsFiles()),
+    CHECK_TRUE(writer->AddSymbolsFeature(virtualRuntime_.GetSymbolsFiles()),
                false, 1, "Fail to AddSymbolsFeature");
 #endif
 

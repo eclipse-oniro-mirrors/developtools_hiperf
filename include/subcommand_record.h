@@ -338,8 +338,11 @@ private:
     uint64_t dataSizeLimit_ = 0;
     bool isDataSizeLimitStop_ = false;
 
-    std::recursive_mutex fileWriterMutex_;
+    // never call virtualRuntime_ while holding fileWriterMutex_ (SetRecordMode
+    // callback re-enters SaveRecord); finalizing thread re-entry uses tlsFinalizingWriter_
+    std::mutex fileWriterMutex_;
     std::unique_ptr<PerfFileWriter> fileWriter_ = nullptr;
+    static thread_local PerfFileWriter *tlsFinalizingWriter_;
 
     // for client
     int clientPipeInput_ = -1;
@@ -425,7 +428,7 @@ private:
     bool AddFeatureRecordFile();
 
     bool CreateInitRecordFile(const bool compressData = false);
-    bool FinishWriteRecordFile();
+    bool FinishWriteRecordFile(PerfFileWriter *writer);
     bool PostProcessRecordFile();
     bool RecordCompleted();
 #ifdef HIPERF_DEBUG_TIME
@@ -527,8 +530,8 @@ private:
     HiperfError StartSamplingAndFile();
     bool AddEventsAndHandleOffCpu();
     bool HandleArmSpeEvent();
-    bool ProcessSymbolsIfNeeded();
-    bool ProcessUserSymbols();
+    bool ProcessSymbolsIfNeeded(PerfFileWriter *writer);
+    bool ProcessUserSymbols(PerfFileWriter *writer);
     void CleanupForBacktrack();
     void UpdateKernelRelatedSymbols();
 

@@ -1853,7 +1853,7 @@ bool PerfEvents::GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSi
     }
     dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
     if (dynSizePos > mmap.header.size || mmap.header.size - dynSizePos < sizeof(uint64_t)) {
-        HLOGEP("invalid syn size position %zu, record size %u", dynSizePos,
+        HLOGEP("invalid dyn size position %zu, record size %u", dynSizePos,
             static_cast<unsigned int>(mmap.header.size));
         return false;
     }
