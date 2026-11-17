@@ -1832,20 +1832,16 @@ size_t PerfEvents::GetStackSizePosInSampleRecord(MmapFd &mmap)
     return pos;
 }
 
-bool PerfEvents::CutStackAndMove(MmapFd &mmap)
+bool PerfEvents::GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSizePos,
+                               uint64_t &stackSize, uint64_t &dynSize)
 {
-    constexpr uint32_t alignSize = 64;
-    if (!(mmap.attr->sample_type & PERF_SAMPLE_STACK_USER)) {
-        return false;
-    }
-    size_t stackSizePos = GetStackSizePosInSampleRecord(mmap);
+    stackSizePos = GetStackSizePosInSampleRecord(mmap);
     if (stackSizePos < sizeof(perf_event_header) || stackSizePos > mmap.header.size ||
         mmap.header.size - stackSizePos < sizeof(uint64_t)) {
         HLOGEP("invalid stack size position %zu, record size %u", stackSizePos,
             static_cast<unsigned int>(mmap.header.size));
         return false;
     }
-    uint64_t stackSize = 0;
     GetRecordFieldFromMmap(mmap, &stackSize, mmap.mmapPage->data_tail + stackSizePos,
                            sizeof(stackSize));
     if (stackSize == 0) {
@@ -1856,14 +1852,27 @@ bool PerfEvents::CutStackAndMove(MmapFd &mmap)
             static_cast<unsigned int>(mmap.header.size));
         return false;
     }
-    size_t dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
+    dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
     if (dynSizePos > mmap.header.size || mmap.header.size - dynSizePos < sizeof(uint64_t)) {
         HLOGEP("invalid syn size position %zu, record size %u", dynSizePos,
             static_cast<unsigned int>(mmap.header.size));
         return false;
     }
-    uint64_t dynSize = 0;
     GetRecordFieldFromMmap(mmap, &dynSize, mmap.mmapPage->data_tail + dynSizePos, sizeof(dynSize));
+    return true;
+}
+
+bool PerfEvents::CutStackAndMove(MmapFd &mmap)
+{
+    constexpr uint32_t alignSize = 64;
+    if (!(mmap.attr->sample_type & PERF_SAMPLE_STACK_USER)) {
+        return false;
+    }
+    size_t stackSizePos = 0;
+    size_t dynSizePos = 0;
+    uint64_t stackSize = 0;
+    uint64_t dynSize = 0;
+    CHECK_TRUE(GetStackSizes(mmap, stackSizePos, dynSizePos, stackSize, dynSize), false, 0, "");
     uint64_t newStackSize = std::min((dynSize + alignSize - 1) &
                                      (~(alignSize >= 1 ? alignSize - 1 : 0)), stackSize);
     if (newStackSize >= stackSize) {

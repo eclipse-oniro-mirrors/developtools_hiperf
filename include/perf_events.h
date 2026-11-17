@@ -580,6 +580,8 @@ private:
     size_t GetCallChainPosInSampleRecord(const perf_event_attr &attr);
     size_t GetSampleReadSizeInSampleRecord(MmapFd &mmap, size_t pos);
     size_t GetStackSizePosInSampleRecord(MmapFd &mmap);
+    bool GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSizePos,
+                       uint64_t &stackSize, uint64_t &dynSize);
     bool CutStackAndMove(MmapFd &mmap);
     inline void WaitDataFromRingBuffer();
     inline bool ProcessRecord(const perf_event_attr* attr, uint8_t* data);
