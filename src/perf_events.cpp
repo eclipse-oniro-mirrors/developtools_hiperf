@@ -864,7 +864,6 @@ bool PerfEvents::StopTracking(void)
             }
         }
         CHECK_TRUE(PerfEventsEnable(false), false, 1, "StopTracking : PerfEventsEnable(false) failed");
-        startedTracking_.store(false, std::memory_order_release);
     }
     return true;
 }
@@ -1848,7 +1847,7 @@ bool PerfEvents::GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSi
         return false;
     }
     if (stackSize > mmap.header.size - stackSizePos - sizeof(uint64_t)) {
-        HLOGEP("invalid stack size %" PRIu64 ", record size %u", stackSizePos,
+        HLOGEP("invalid stack size %" PRIu64 ", record size %u", stackSize,
             static_cast<unsigned int>(mmap.header.size));
         return false;
     }
