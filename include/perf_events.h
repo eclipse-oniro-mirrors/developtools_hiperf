@@ -565,7 +565,7 @@ private:
     std::condition_variable cvRecordBuf_;
     std::thread readRecordBufThread_;
     std::atomic_bool readRecordThreadRunning_ = false;
-    bool startedTracking_ = false;
+    std::atomic_bool startedTracking_ = false;
     bool isLowPriorityThread_ = false;
     void RecordLoop();
     void StatLoop();
@@ -580,6 +580,8 @@ private:
     size_t GetCallChainPosInSampleRecord(const perf_event_attr &attr);
     size_t GetSampleReadSizeInSampleRecord(MmapFd &mmap, size_t pos);
     size_t GetStackSizePosInSampleRecord(MmapFd &mmap);
+    bool GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSizePos,
+                       uint64_t &stackSize, uint64_t &dynSize);
     bool CutStackAndMove(MmapFd &mmap);
     inline void WaitDataFromRingBuffer();
     inline bool ProcessRecord(const perf_event_attr* attr, uint8_t* data);
@@ -748,9 +750,9 @@ private:
 
     // for background track
     bool backtrack_ = false;
-    bool outputTracking_ = false;
+    std::atomic_bool outputTracking_ = false;
     uint64_t backtrackTime_ = 0;
-    uint64_t outputEndTime_ = 0;
+    std::atomic<uint64_t> outputEndTime_ = 0;
     bool IsSkipRecordForBacktrack(const PerfRecordSample& sample);
     void ProcessEventGroupItems(__u64 durationInSec);
     bool HandleTokensTracePoint(const std::vector<std::string>& eventTokens, std::string& name,

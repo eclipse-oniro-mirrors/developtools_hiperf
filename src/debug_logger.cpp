@@ -199,7 +199,9 @@ void DebugLogger::SetLogTags(const std::string &tags)
     logTagLevelmap_.clear();
     for (auto tagLevel : tagLevels) {
         auto tagLevelPair = StringSplit(tagLevel, ":");
-        if (tagLevelPair.size() == 1) { // only tag
+        if (tagLevelPair.empty()) {
+            continue;
+        } else if (tagLevelPair.size() == 1) { // only tag
             logTagLevelmap_[tagLevelPair[0]] = LEVEL_MUCH;
         } else { // tag:level
             logTagLevelmap_[tagLevelPair[0]] = GetLogLevelByName(tagLevelPair[1].c_str());

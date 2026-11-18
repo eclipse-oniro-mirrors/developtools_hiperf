@@ -2553,7 +2553,7 @@ HWTEST_F(SubCommandRecordTest, ProcessUserSymbols, TestSize.Level2)
     SubCommandRecord recordCmd;
     recordCmd.dedupStack_ = true;
     recordCmd.fileWriter_ = std::make_unique<PerfFileWriter>();
-    bool result = recordCmd.ProcessUserSymbols();
+    bool result = recordCmd.ProcessUserSymbols(recordCmd.fileWriter_.get());
     EXPECT_TRUE(result);
 }
 

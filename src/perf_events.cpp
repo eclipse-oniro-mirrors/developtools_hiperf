@@ -870,21 +870,21 @@ bool PerfEvents::StopTracking(void)
 
 bool PerfEvents::PauseTracking(void)
 {
-    CHECK_TRUE(startedTracking_, false, 0, "");
+    CHECK_TRUE(startedTracking_.load(std::memory_order_acquire), false, 0, "");
     HIPERF_HILOGI(MODULE_DEFAULT, "some one called PauseTracking");
     return PerfEventsEnable(false);
 }
 
 bool PerfEvents::ResumeTracking(void)
 {
-    CHECK_TRUE(startedTracking_, false, 0, "");
+    CHECK_TRUE(startedTracking_.load(std::memory_order_acquire), false, 0, "");
     HIPERF_HILOGI(MODULE_DEFAULT, "some one called ResumeTracking");
     return PerfEventsEnable(true);
 }
 
 bool PerfEvents::OutputTracking()
 {
-    if (!startedTracking_) {
+    if (!startedTracking_.load(std::memory_order_acquire)) {
         HIPERF_HILOGI(MODULE_DEFAULT, "OutputTracking failed, not start tracking...");
         return false;
     }
@@ -894,15 +894,22 @@ bool PerfEvents::OutputTracking()
         return true;
     }
 
-    outputEndTime_ = currentTimeSecond_.load();
-    outputTracking_ = true;
+    outputEndTime_.store(currentTimeSecond_.load(), std::memory_order_relaxed);
+    outputTracking_.store(true, std::memory_order_release);
     return true;
 }
 
 bool PerfEvents::EnableTracking()
 {
-    CHECK_TRUE(!startedTracking_, true, 0, "");
-    CHECK_TRUE(PerfEventsEnable(true), false, 1, "PerfEvents::PerfEventsEnable() failed");
+    bool expected = false;
+    if (!startedTracking_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+        return true;
+    }
+    if (!PerfEventsEnable(true)) {
+        startedTracking_.store(false, std::memory_order_release);
+        HLOGEP("PerfEvents::PerfEventsEnable() failed");
+        return false;
+    }
 
     if (trackedCommand_) {
         // start tracked Command
@@ -914,13 +921,14 @@ bool PerfEvents::EnableTracking()
                 }
                 std::string commandName = trackedCommand_->GetCommandName();
                 printf("failed to execute command: %zu: %s\n", commandName.size(), commandName.c_str());
+                startedTracking_.store(false, std::memory_order_release);
                 return false;
             }
         } else if (trackedCommand_->GetState() != TrackedCommand::State::COMMAND_STARTED) {
+            startedTracking_.store(false, std::memory_order_release);
             return false;
         }
     }
-    startedTracking_ = true;
     return true;
 }
 
@@ -931,12 +939,12 @@ bool PerfEvents::IsTrackRunning()
 
 bool PerfEvents::IsOutputTracking()
 {
-    return outputTracking_;
+    return outputTracking_.load(std::memory_order_acquire);
 }
 
 void PerfEvents::SetOutputTrackingStatus(const bool status)
 {
-    outputTracking_ = status;
+    outputTracking_.store(status, std::memory_order_release);
 }
 
 void PerfEvents::SetSystemTarget(const bool systemTarget)
@@ -1152,10 +1160,10 @@ void PerfEvents::ReleaseRecordResources()
     { std::vector<OHOS::UniqueFd>().swap(groups_); }
     { std::vector<EventGroupItem>().swap(eventGroupItem_); }
 
-    startedTracking_ = false;
+    startedTracking_.store(false, std::memory_order_release);
     prepared_ = false;
     readRecordThreadRunning_ = false;
-    outputTracking_ = false;
+    outputTracking_.store(false, std::memory_order_release);
     recordBufReady_ = false;
 }
 
@@ -1823,22 +1831,47 @@ size_t PerfEvents::GetStackSizePosInSampleRecord(MmapFd &mmap)
     return pos;
 }
 
+bool PerfEvents::GetStackSizes(MmapFd &mmap, size_t &stackSizePos, size_t &dynSizePos,
+                               uint64_t &stackSize, uint64_t &dynSize)
+{
+    stackSizePos = GetStackSizePosInSampleRecord(mmap);
+    if (stackSizePos < sizeof(perf_event_header) || stackSizePos > mmap.header.size ||
+        mmap.header.size - stackSizePos < sizeof(uint64_t)) {
+        HLOGEP("invalid stack size position %zu, record size %u", stackSizePos,
+            static_cast<unsigned int>(mmap.header.size));
+        return false;
+    }
+    GetRecordFieldFromMmap(mmap, &stackSize, mmap.mmapPage->data_tail + stackSizePos,
+                           sizeof(stackSize));
+    if (stackSize == 0) {
+        return false;
+    }
+    if (stackSize > mmap.header.size - stackSizePos - sizeof(uint64_t)) {
+        HLOGEP("invalid stack size %" PRIu64 ", record size %u", stackSize,
+            static_cast<unsigned int>(mmap.header.size));
+        return false;
+    }
+    dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
+    if (dynSizePos > mmap.header.size || mmap.header.size - dynSizePos < sizeof(uint64_t)) {
+        HLOGEP("invalid dyn size position %zu, record size %u", dynSizePos,
+            static_cast<unsigned int>(mmap.header.size));
+        return false;
+    }
+    GetRecordFieldFromMmap(mmap, &dynSize, mmap.mmapPage->data_tail + dynSizePos, sizeof(dynSize));
+    return true;
+}
+
 bool PerfEvents::CutStackAndMove(MmapFd &mmap)
 {
     constexpr uint32_t alignSize = 64;
     if (!(mmap.attr->sample_type & PERF_SAMPLE_STACK_USER)) {
         return false;
     }
-    size_t stackSizePos = GetStackSizePosInSampleRecord(mmap);
+    size_t stackSizePos = 0;
+    size_t dynSizePos = 0;
     uint64_t stackSize = 0;
-    GetRecordFieldFromMmap(mmap, &stackSize, mmap.mmapPage->data_tail + stackSizePos,
-                           sizeof(stackSize));
-    if (stackSize == 0) {
-        return false;
-    }
-    size_t dynSizePos = stackSizePos + sizeof(uint64_t) + stackSize;
     uint64_t dynSize = 0;
-    GetRecordFieldFromMmap(mmap, &dynSize, mmap.mmapPage->data_tail + dynSizePos, sizeof(dynSize));
+    CHECK_TRUE(GetStackSizes(mmap, stackSizePos, dynSizePos, stackSize, dynSize), false, 0, "");
     uint64_t newStackSize = std::min((dynSize + alignSize - 1) &
                                      (~(alignSize >= 1 ? alignSize - 1 : 0)), stackSize);
     if (newStackSize >= stackSize) {
@@ -1850,11 +1883,20 @@ bool PerfEvents::CutStackAndMove(MmapFd &mmap)
     //             ^                    ^                        ^                 ^
     //         new_header          stackSizePos         <stackSize-dynSize>     dynSizePos
     uint16_t recordSize = mmap.header.size;
-    mmap.header.size -= stackSize - newStackSize; // reduce the stack size
+    uint64_t cutSize = stackSize - newStackSize;
+    if (cutSize > recordSize) {
+        HLOGEP("invalid stack size %" PRIu64 ", record size %u", cutSize,
+            static_cast<unsigned int>(recordSize));
+        return false;
+    }
+    mmap.header.size = static_cast<uint16_t>(recordSize - cutSize);
+    if (mmap.header.size < sizeof(perf_event_header)) {
+        return false;
+    }
     uint8_t *buf = recordBuf_->AllocForWrite(mmap.header.size);
     // copy1: new_header
     CHECK_TRUE(buf != nullptr, false, 0, "");
-    if (memcpy_s(buf, sizeof(perf_event_header), &(mmap.header), sizeof(perf_event_header)) != 0) {
+    if (memcpy_s(buf, mmap.header.size, &(mmap.header), sizeof(perf_event_header)) != 0) {
         HLOGEP("memcpy_s mmap.header to buf failed. size %zd", sizeof(perf_event_header));
     }
     size_t copyPos = sizeof(perf_event_header);
@@ -1866,7 +1908,8 @@ bool PerfEvents::CutStackAndMove(MmapFd &mmap)
     GetRecordFieldFromMmap(mmap, buf + copyPos, mmap.mmapPage->data_tail + dynSizePos,
                            recordSize - dynSizePos);
     // update stack_size
-    if (memcpy_s(buf + stackSizePos, sizeof(stackSize), &(newStackSize), sizeof(newStackSize)) != 0) {
+    if (memcpy_s(buf + stackSizePos, mmap.header.size - stackSizePos,
+                 &(newStackSize), sizeof(newStackSize)) != 0) {
         HLOGEP("memcpy_s newStack to buf stackSizePos failed. size %zd", sizeof(newStackSize));
     }
     recordBuf_->EndWrite();
@@ -1969,15 +2012,15 @@ void PerfEvents::ReadRecordFromBuf()
 
     while (readRecordThreadRunning_) {
         WaitDataFromRingBuffer();
-        bool output = outputTracking_;
+        bool output = outputTracking_.load(std::memory_order_acquire);
         while ((p = recordBuf_->GetReadData()) != nullptr) {
             if (!ProcessRecord(attr, p)) {
                 break;
             }
         }
         if (backtrack_ && output) {
-            outputTracking_ = false;
-            outputEndTime_ = 0;
+            outputTracking_.store(false, std::memory_order_release);
+            outputEndTime_.store(0, std::memory_order_relaxed);
         }
     }
     HLOGD("exit because trackStoped");
@@ -2178,11 +2221,11 @@ void PerfEvents::UpdateCurrentTime()
 // check if this record should be saved, this function only can called in back track mode
 bool PerfEvents::IsSkipRecordForBacktrack(const PerfRecordSample& sample)
 {
-    if (outputTracking_) {
+    if (outputTracking_.load(std::memory_order_acquire)) {
         // when outputing record, only skip what later than end time
-        if (sample.GetTime() / NANO_SECONDS_PER_SECOND > outputEndTime_) {
-            outputTracking_ = false;
-            outputEndTime_ = 0;
+        if (sample.GetTime() / NANO_SECONDS_PER_SECOND > outputEndTime_.load(std::memory_order_relaxed)) {
+            outputTracking_.store(false, std::memory_order_release);
+            outputEndTime_.store(0, std::memory_order_relaxed);
             return true;
         }
         return false;
