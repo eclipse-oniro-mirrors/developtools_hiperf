@@ -33,6 +33,7 @@
 
 #include "perf_events.h"
 #include "test_utilities.h"
+#include "hiperf_hilog.h"
 #include "tracked_command.h"
 
 using namespace testing::ext;
@@ -2538,6 +2539,8 @@ HWTEST_F(SubCommandStatTest, HandleChildProcess_FifoOpenFail, TestSize.Level2)
     SubCommandStat statCmd;
     statCmd.fifoFileS2C_ = invalidFifo;
     statCmd.isFifoServer_ = false;
+    fdsan_exchange_owner_tag(STDIN_FILENO, 0, HIPERF_FD_TAG);
+    fdsan_exchange_owner_tag(STDERR_FILENO, 0, HIPERF_FD_TAG);
     bool result = statCmd.HandleChildProcess();
     EXPECT_FALSE(result);
     EXPECT_TRUE(statCmd.isFifoServer_);
