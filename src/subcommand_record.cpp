@@ -2314,7 +2314,8 @@ bool SubCommandRecord::PostProcessRecordFile()
 
         // lte FinishWriteRecordFile write matched only symbols
         delayUnwind_ = false;
-        CHECK_TRUE(FinishWriteRecordFile(fileWriter_.get()), false, 1, "Fail to finish record file %s", outputFilename_.c_str());
+        CHECK_TRUE(FinishWriteRecordFile(fileWriter_.get()), false, 1,
+            "Fail to finish record file %s", outputFilename_.c_str());
 
         remove(tempFileName.c_str());
     }
