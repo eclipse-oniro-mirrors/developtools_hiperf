@@ -41,8 +41,8 @@ std::shared_ptr<DfxMap> MemoryMapManager::UpdateThreadMaps(const pid_t pid, cons
 {
     VirtualThread& thread = threadManager_.GetThread(pid, tid);
     std::shared_ptr<DfxMap> map = thread.CreateMapItem(filename, begin, len, offset, prot);
-    if (ctx_.isHM) {
-        thread.FixHMBundleMap();
+    if (ctx_.isHM && map != nullptr) {
+        NeedAdaptHMBundlePath(map->name, thread.name_);
     }
     return map;
 }

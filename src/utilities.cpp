@@ -1096,10 +1096,6 @@ bool NeedAdaptSandboxPath(char *filename, const int pid, u16 &headerSize)
 
 bool NeedAdaptHMBundlePath(std::string& filename, const std::string& threadname)
 {
-    static bool needCheck = true;
-    if (!needCheck) {
-        return false;
-    }
     const std::string path = "/data/storage/el1/bundle";
     std::string newFileName = filename;
     size_t pos = newFileName.find(path);
@@ -1115,8 +1111,6 @@ bool NeedAdaptHMBundlePath(std::string& filename, const std::string& threadname)
             filename = newFileName;
             HLOGD("Fix hm bundle path to %s", filename.c_str());
             return true;
-        } else {
-            needCheck = false;
         }
     }
     return false;
