@@ -1209,8 +1209,16 @@ public:
                 static_cast<uintptr_t>(map->begin), static_cast<uintptr_t>(map->offset),
                 filePath_.c_str(), extractor, &jsFunc, false);
             if (ret == -1) {
-                HLOGD("failed to call ParseArkFileInfo, the symbol file is : %s", map->name.c_str());
-                return DfxSymbol(ip, "");
+                // leaf frames are not -4 adjusted by AdjustCallChain, retry with raw ip
+                HLOGD("retry ParseArkFileInfo with raw ip:0x%" PRIx64, ip);
+                ret = DfxArk::Instance().ParseArkFileInfo(static_cast<uintptr_t>(ip),
+                    static_cast<uintptr_t>(map->begin), static_cast<uintptr_t>(map->offset),
+                    filePath_.c_str(), extractor, &jsFunc, false);
+                if (ret == -1) {
+                    HLOGD("failed to call ParseArkFileInfo, the symbol file is : %s",
+                          map->name.c_str());
+                    return DfxSymbol(ip, "");
+                }
             }
         } else {
             HLOGD("ParseArkFrameInfo ip:0x%" PRIx64 " begin:0x%" PRIx64 " extractor:0x%" PRIx64 " file:%s",
